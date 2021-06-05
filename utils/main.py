@@ -104,7 +104,10 @@ def parse_text_message(messages):
 
     # Print the text messages
     for f in messages:
-        print(f"Date: {f['composetime'][:19]} - User: {f['imdisplayname']} - Message: {f['content']}")
+        try:
+            print(f"Date: {f['composetime'][:19]} - User: {f['imdisplayname']} - Message: {f['content']}")
+        except:
+            pass
 
 def read_input(filepath):
     # Do some basic error handling
