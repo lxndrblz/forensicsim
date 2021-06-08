@@ -5,6 +5,7 @@ from pathlib import Path
 
 import click
 import pyfiglet
+import json
 
 from ccl_chrome_indexeddb import ccl_leveldb
 
@@ -124,9 +125,9 @@ def parse_records(fetched_ldb_records):
     # reactions = [d for d in cleaned_records if d['type'] == 'reaction_in_chat']
     # parse_message_reaction(reactions)
     #
-    # # Filter by media messages
-    # media_messages = [d for d in cleaned_records if d['type'] == 'media']
-    # parse_media_messages(media_messages)
+    # Filter by media messages
+    #media_messages = [d for d in cleaned_records if d['type'] == 'media']
+    #parse_media_messages(media_messages)
 
 
 def parse_message_reaction(messages):
@@ -148,6 +149,10 @@ def parse_media_messages(messages):
 def parse_text_message(messages):
 
     messages.sort(key=lambda date: datetime.strptime(date['composetime'][:19], "%Y-%m-%dT%H:%M:%S"))
+
+    # Dump messages into a json file
+    with open('messages.json', 'w') as f:
+        json.dump(messages, f)
 
     # Print the text messages
     for f in messages:
