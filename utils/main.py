@@ -5,6 +5,8 @@ import pyfiglet
 from ccl_chrome_indexeddb import ccl_leveldb
 from pathlib import Path
 import re
+import ast
+import json
 
 ENCODING = "iso-8859-1"
 
@@ -41,46 +43,11 @@ def parse_db(filepath):
 
     try:
         for record in db.iterate_records_raw():
-            is_dictionary_key = True  # store current field state (key or value)
-            key, value = '', ''
-            out = {}
-            # Ignore entries without a quotation mark as these do not represent the data structure we are looking for
-            if record.value.find(b'"') != -1:
-                # Split a record value by the quotation mark
-                # TODO Fix an issue where nested schemas get lost
-                for i, field in enumerate(record.value.split(b'"')):
-                    if i == 0:  # skip first field
-                        continue
-                    le = len(field)
-                    if not le:
-                        continue
-                    if le == 1:
-                        is_dictionary_key = not is_dictionary_key
-                        continue
-
-                    elif (le - 1) > field[0]:
-                        if is_dictionary_key:
-                            key = decode_value(field[1:field[0] + 1])
-                            value = decode_value(field[field[0] + 1:])
-                            out[key] = value
-
-                        else:
-                            value = decode_value(field[1:field[0] + 1])
-                            out[key] = value
-                            is_dictionary_key = not is_dictionary_key
-                        continue
-
-                    if is_dictionary_key:
-                        key = decode_value(field[1:])
-                    else:
-                        value = field[1:]
-                        out[key] = strip_html_tags(decode_value(value))
-                    is_dictionary_key = not is_dictionary_key
-                fetched_ldb_records.append(out)
-
+            # Ignore empty records
+            if record.value is not None:
+                fetched_ldb_records.append(record)
     except ValueError:
         print(f'Exception reading LevelDB: ValueError')
-
     except Exception as e:
         print(f'Exception reading LevelDB: {e}')
     # Close the database
@@ -89,21 +56,60 @@ def parse_db(filepath):
     parse_records(fetched_ldb_records)
 
 
+def get_nested_data_structures(record):
+    nested_schemas = record.split(b'[{')[-1:]
+    nested_schemas = nested_schemas[0].split(b'}]')[:-1]
+    # Add search criteria back to the string to make list and dictionary structures complete again
+    byte_str = b'[{' + nested_schemas[0] + b'}]'
+    # turn the byte string into a Python list with dictionaries
+    nested_dictionary = ast.literal_eval(byte_str.decode('utf-8'))
+    return nested_dictionary
+
+
+def parse_records_test(fetched_ldb_records):
+
+    for f in fetched_ldb_records:
+        if b'react' in f.value:
+            print(f)
+
 def parse_records(fetched_ldb_records):
-    text_messages = []
-    file_messages = []
+
+
+    COMMON_FIELDS = [b'messagetype', b'contenttype',b'content', b'renderContent', b'clientmessageid',b'imdisplayname', b'composetime', b'originalarrivaltime', b'clientArrivalTime']
+    NESTED_SCHEMAS = [b'files']
+    cleaned_records = []
     # Split up records by message type
     # TODO Identify remaining message types and add theese
-    for f in fetched_ldb_records:
-        try:
-            if f['messagetype'] == 'RichText/Html' and f['composetime'] is not None:
-                text_messages.append(f)
-            elif f['messagetype'] == 'Text' and f['composetime'] is not None:
-                file_messages.append(f)
-        except:
-            pass
-    if text_messages is not None:
-        parse_text_message(text_messages)
+    for f_byte in fetched_ldb_records:
+        record = f_byte.value
+        if b'like' in record:
+            print(record)
+        cleaned_record = {}
+        if record.find(b'"') != -1:
+            # Split a record value by the quotation mark
+            key_values = record.split(b'"')
+            for i, field in enumerate(key_values):
+                # check if field is a key - ignore the first byte as it is usually junk
+                if field[1::] in COMMON_FIELDS:
+                    # use current field as key, use next field as value
+                    cleaned_record[field[1::]] = strip_html_tags(decode_value(key_values[i+1][1::]))
+                if field[1::] in NESTED_SCHEMAS:
+                    cleaned_record[field[1::]] = get_nested_data_structures(record)
+                # Check if our dictionary is empty
+        if bool(cleaned_record):
+            # Decode the keys from bytes
+            cleaned_record = { key.decode(): val for key, val in cleaned_record.items() }
+            #record_dict = ast.literal_eval(decode_value(cleaned_record))
+            # Include complete record for debugging purpose
+            # record_dict['raw'] = f
+            cleaned_records.append(cleaned_record)
+
+    # Sorth the entries in ascending order
+    cleaned_records.sort(key=lambda r: datetime.strptime(r['composetime'][:19], "%Y-%m-%dT%H:%M:%S"))
+
+    with open('dumped_database.json', 'w') as f:
+        json.dump(cleaned_records, f)
+
 
 
 def parse_text_message(messages):
