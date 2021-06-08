@@ -4,14 +4,19 @@ import click
 import pyfiglet
 from ccl_chrome_indexeddb import ccl_leveldb
 from pathlib import Path
-import csv
+import re
 
 ENCODING = "iso-8859-1"
 
 
 def decode_value(b):
+    # Cut off some unwanted HEX bytes
     try:
-        value = b.replace(b'\x00', b'').decode()
+        b = b.replace(b'\x00', b'')
+        b = b.replace(b'\x01', b'')
+        b = b.replace(b'\x02', b'')
+        value = b.decode()
+
     except UnicodeDecodeError:
         try:
             value = b.decode('utf-16')
@@ -19,6 +24,12 @@ def decode_value(b):
             value = str(b)
     return value
 
+def strip_html_tags(value):
+    try:
+        value = re.findall(r'<div>(.*)</div>', value)[0]
+        return value
+    except:
+        return value
 
 def parse_db(filepath):
     fetched_ldb_records = []
@@ -50,11 +61,11 @@ def parse_db(filepath):
                     elif (le - 1) > field[0]:
                         if is_dictionary_key:
                             key = decode_value(field[1:field[0] + 1])
-                            value = field[field[0] + 1:]
+                            value = decode_value(field[field[0] + 1:])
                             out[key] = value
 
                         else:
-                            value = field[1:field[0] + 1]
+                            value = decode_value(field[1:field[0] + 1])
                             out[key] = value
                             is_dictionary_key = not is_dictionary_key
                         continue
@@ -63,7 +74,7 @@ def parse_db(filepath):
                         key = decode_value(field[1:])
                     else:
                         value = field[1:]
-                        out[key] = decode_value(value)
+                        out[key] = strip_html_tags(decode_value(value))
                     is_dictionary_key = not is_dictionary_key
                 fetched_ldb_records.append(out)
 
@@ -82,12 +93,12 @@ def parse_records(fetched_ldb_records):
     text_messages = []
     file_messages = []
     # Split up records by message type
+    # TODO Identify remaining message types and add theese
     for f in fetched_ldb_records:
         try:
             if f['messagetype'] == 'RichText/Html' and f['composetime'] is not None:
                 text_messages.append(f)
             elif f['messagetype'] == 'Text' and f['composetime'] is not None:
-                print(f)
                 file_messages.append(f)
         except:
             pass
@@ -125,12 +136,11 @@ def read_input(filepath):
     parse_db(filepath)
 
 
-# Load conversation History from JSON
 @click.command()
 @click.option('--filepath', '-f', required=True, default='data/conversation.json',
               help="Relative file path to JSON with conversation data")
 def cli(filepath):
-    header = pyfiglet.figlet_format("Forensics.im")
+    header = pyfiglet.figlet_format("Forensics.im Dump Tool")
     click.echo(header)
     read_input(filepath)
 
