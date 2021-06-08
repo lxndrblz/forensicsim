@@ -1,12 +1,12 @@
+import ast
+import re
 from datetime import datetime
+from pathlib import Path
 
 import click
 import pyfiglet
+
 from ccl_chrome_indexeddb import ccl_leveldb
-from pathlib import Path
-import re
-import ast
-import json
 
 ENCODING = "iso-8859-1"
 
@@ -66,65 +66,92 @@ def get_nested_data_structures(record):
     return nested_dictionary
 
 
-def parse_records_test(fetched_ldb_records):
+def determine_record_type(record):
+    types = {
+        'reaction_in_chat': {'identifier': {b'activityType': 'reactionInChat'}, 'fields': [b'activityType', b'messagetype', b'contenttype', b'activitySubtype', b'activityTimestamp', b'composetime', b'sourceUserImDisplayName'], 'nested_schema':None},
+        'media': {'identifier': {b'messagetype': 'Text'}, 'fields':[b'messagetype', b'imdisplayname', b'composetime', b'files'], 'nested_schema':b'files'},
+        'message': {'identifier': {b'messagetype': 'RichText/Html'}, 'fields':[b'messagetype',b'contenttype', b'imdisplayname', b'content', b'renderContent', b'clientmessageid', b'composetime', b'originalarrivaltime', b'clientArrivalTime'], 'nested_schema':None},
+        'call': {'identifier': {b'messagetype': 'Event/Call'}, 'fields': [b'messagetype', b'displayName', b'originalarrivaltime', b'clientArrivalTime'], 'nested_schema':None},
 
-    for f in fetched_ldb_records:
-        if b'react' in f.value:
-            print(f)
+    }
 
-def parse_records(fetched_ldb_records):
-
-
-    COMMON_FIELDS = [b'messagetype', b'contenttype',b'content', b'renderContent', b'clientmessageid',b'imdisplayname', b'composetime', b'originalarrivaltime', b'clientArrivalTime']
-    NESTED_SCHEMAS = [b'files']
-    cleaned_records = []
-    # Split up records by message type
-    # TODO Identify remaining message types and add theese
-    for f_byte in fetched_ldb_records:
-        record = f_byte.value
-        if b'like' in record:
-            print(record)
-        cleaned_record = {}
+    for key in types:
         if record.find(b'"') != -1:
-            # Split a record value by the quotation mark
+            t = True
+            cleaned_record = {}
             key_values = record.split(b'"')
             for i, field in enumerate(key_values):
                 # check if field is a key - ignore the first byte as it is usually junk
-                if field[1::] in COMMON_FIELDS:
+                if field[1::] in types[key]['fields']:
                     # use current field as key, use next field as value
                     cleaned_record[field[1::]] = strip_html_tags(decode_value(key_values[i+1][1::]))
-                if field[1::] in NESTED_SCHEMAS:
-                    cleaned_record[field[1::]] = get_nested_data_structures(record)
-                # Check if our dictionary is empty
-        if bool(cleaned_record):
-            # Decode the keys from bytes
-            cleaned_record = { key.decode(): val for key, val in cleaned_record.items() }
-            #record_dict = ast.literal_eval(decode_value(cleaned_record))
-            # Include complete record for debugging purpose
-            # record_dict['raw'] = f
+                # Get nested schemas, such as files
+                if field[1::] == types[key]['nested_schema']:
+                    nested = get_nested_data_structures(record)
+                    cleaned_record[field[1::]] = nested
+
+
+            # Determine the message type by checking if the identifiers match
+            for identifier_key in types[key]['identifier']:
+                if (identifier_key in cleaned_record):
+                    if(cleaned_record[identifier_key] != types[key]['identifier'][identifier_key]):
+                        t = False
+
+            # Lets only consider the entries that are complete and that have a valid content type
+            if t and all(c in cleaned_record for c in types[key]['fields']):
+                cleaned_record[b'type'] = key
+                return cleaned_record
+    # No type could be determined
+    return None
+
+def parse_records(fetched_ldb_records):
+
+    # Split up records by message type
+    cleaned_records = []
+
+    for f_byte in fetched_ldb_records:
+        record = determine_record_type(f_byte.value)
+        if record is not None:
+            # Decode the dict keys
+            cleaned_record = { key.decode(): val for key, val in record.items() }
             cleaned_records.append(cleaned_record)
 
-    # Sorth the entries in ascending order
-    cleaned_records.sort(key=lambda r: datetime.strptime(r['composetime'][:19], "%Y-%m-%dT%H:%M:%S"))
+    # Filter by messages
+    messages = [d for d in cleaned_records if d['type'] == 'message']
+    parse_text_message(messages)
 
-    with open('dumped_database.json', 'w') as f:
-        json.dump(cleaned_records, f)
+    # Filter by reactions
+    # reactions = [d for d in cleaned_records if d['type'] == 'reaction_in_chat']
+    # parse_message_reaction(reactions)
+    #
+    # # Filter by media messages
+    # media_messages = [d for d in cleaned_records if d['type'] == 'media']
+    # parse_media_messages(media_messages)
 
+
+def parse_message_reaction(messages):
+    messages.sort(key=lambda date: datetime.strptime(date['composetime'][:19], "%Y-%m-%dT%H:%M:%S"))
+
+    # TODO Show messages, which the user responded
+    for f in messages:
+        print(f"Date: {f['composetime'][:19]} - User: {f['sourceUserImDisplayName']} - Liked Message in Chat")
+
+def parse_media_messages(messages):
+    messages.sort(key=lambda date: datetime.strptime(date['composetime'][:19], "%Y-%m-%dT%H:%M:%S"))
+
+    for m in messages:
+        # print all files that are attached to a message
+        for file in m['files']:
+            print(f"Date: {m['composetime'][:19]} - User: {m['imdisplayname']} - File: {file['fileName']} Path: {file['objectUrl']}")
 
 
 def parse_text_message(messages):
 
-    # Sort messages by compose date
-    # Data format 2021-06-01T12:47:45.926Z
-    # TODO miliseconds should not be cut off
     messages.sort(key=lambda date: datetime.strptime(date['composetime'][:19], "%Y-%m-%dT%H:%M:%S"))
 
     # Print the text messages
     for f in messages:
-        try:
-            print(f"Date: {f['composetime'][:19]} - User: {f['imdisplayname']} - Message: {f['content']}")
-        except:
-            pass
+        print(f"Compose Time: {f['composetime'][:19]} - User: {f['imdisplayname']} - Message: {f['content']}")
 
 def read_input(filepath):
     # Do some basic error handling
