@@ -1,11 +1,11 @@
 import ast
+import json
 import re
 from datetime import datetime
 from pathlib import Path
 
 import click
 import pyfiglet
-import json
 
 from ccl_chrome_indexeddb import ccl_leveldb
 
@@ -27,6 +27,7 @@ def decode_value(b):
             value = str(b)
     return value
 
+
 def strip_html_tags(value):
     try:
         value = re.findall(r'<div>(.*)</div>', value)[0]
@@ -34,13 +35,13 @@ def strip_html_tags(value):
     except:
         return value
 
+
 def parse_db(filepath):
     fetched_ldb_records = []
     try:
         db = ccl_leveldb.RawLevelDb(filepath)
     except Exception as e:
         print(f' - Could not open {filepath} as LevelDB; {e}')
-
 
     try:
         for record in db.iterate_records_raw():
@@ -69,10 +70,19 @@ def get_nested_data_structures(record):
 
 def determine_record_type(record):
     types = {
-        'reaction_in_chat': {'identifier': {b'activityType': 'reactionInChat'}, 'fields': [b'activityType', b'messagetype', b'contenttype', b'activitySubtype', b'activityTimestamp', b'composetime', b'sourceUserImDisplayName'], 'nested_schema':None},
-        'media': {'identifier': {b'messagetype': 'Text'}, 'fields':[b'messagetype', b'imdisplayname', b'composetime', b'files'], 'nested_schema':b'files'},
-        'message': {'identifier': {b'messagetype': 'RichText/Html'}, 'fields':[b'messagetype',b'contenttype', b'imdisplayname', b'content', b'renderContent', b'clientmessageid', b'composetime', b'originalarrivaltime', b'clientArrivalTime'], 'nested_schema':None},
-        'call': {'identifier': {b'messagetype': 'Event/Call'}, 'fields': [b'messagetype', b'displayName', b'originalarrivaltime', b'clientArrivalTime'], 'nested_schema':None},
+        'reaction_in_chat': {'identifier': {b'activityType': 'reactionInChat'},
+                             'fields': [b'activityType', b'messagetype', b'contenttype', b'activitySubtype',
+                                        b'activityTimestamp', b'composetime', b'sourceUserImDisplayName'],
+                             'nested_schema': None},
+        'media': {'identifier': {b'messagetype': 'Text'},
+                  'fields': [b'messagetype', b'imdisplayname', b'composetime', b'files'], 'nested_schema': b'files'},
+        'message': {'identifier': {b'messagetype': 'RichText/Html'},
+                    'fields': [b'messagetype', b'contenttype', b'imdisplayname', b'content', b'renderContent',
+                               b'clientmessageid', b'composetime', b'originalarrivaltime', b'clientArrivalTime'],
+                    'nested_schema': None},
+        'call': {'identifier': {b'messagetype': 'Event/Call'},
+                 'fields': [b'messagetype', b'displayName', b'originalarrivaltime', b'clientArrivalTime'],
+                 'nested_schema': None},
 
     }
 
@@ -85,17 +95,16 @@ def determine_record_type(record):
                 # check if field is a key - ignore the first byte as it is usually junk
                 if field[1::] in types[key]['fields']:
                     # use current field as key, use next field as value
-                    cleaned_record[field[1::]] = strip_html_tags(decode_value(key_values[i+1][1::]))
+                    cleaned_record[field[1::]] = strip_html_tags(decode_value(key_values[i + 1][1::]))
                 # Get nested schemas, such as files
                 if field[1::] == types[key]['nested_schema']:
                     nested = get_nested_data_structures(record)
                     cleaned_record[field[1::]] = nested
 
-
             # Determine the message type by checking if the identifiers match
             for identifier_key in types[key]['identifier']:
-                if (identifier_key in cleaned_record):
-                    if(cleaned_record[identifier_key] != types[key]['identifier'][identifier_key]):
+                if identifier_key in cleaned_record:
+                    if cleaned_record[identifier_key] != types[key]['identifier'][identifier_key]:
                         t = False
 
             # Lets only consider the entries that are complete and that have a valid content type
@@ -105,8 +114,8 @@ def determine_record_type(record):
     # No type could be determined
     return None
 
-def parse_records(fetched_ldb_records):
 
+def parse_records(fetched_ldb_records):
     # Split up records by message type
     cleaned_records = []
 
@@ -114,7 +123,7 @@ def parse_records(fetched_ldb_records):
         record = determine_record_type(f_byte.value)
         if record is not None:
             # Decode the dict keys
-            cleaned_record = { key.decode(): val for key, val in record.items() }
+            cleaned_record = {key.decode(): val for key, val in record.items()}
             cleaned_records.append(cleaned_record)
 
     # Filter by messages
@@ -126,16 +135,17 @@ def parse_records(fetched_ldb_records):
     # parse_message_reaction(reactions)
     #
     # Filter by media messages
-    #media_messages = [d for d in cleaned_records if d['type'] == 'media']
-    #parse_media_messages(media_messages)
+    # media_messages = [d for d in cleaned_records if d['type'] == 'media']
+    # parse_media_messages(media_messages)
 
 
 def parse_message_reaction(messages):
     messages.sort(key=lambda date: datetime.strptime(date['composetime'][:19], "%Y-%m-%dT%H:%M:%S"))
 
-    # TODO Show messages, which the user responded
+    # TODO Show messages (id), which the user responded to
     for f in messages:
         print(f"Date: {f['composetime'][:19]} - User: {f['sourceUserImDisplayName']} - Liked Message in Chat")
+
 
 def parse_media_messages(messages):
     messages.sort(key=lambda date: datetime.strptime(date['composetime'][:19], "%Y-%m-%dT%H:%M:%S"))
@@ -143,11 +153,11 @@ def parse_media_messages(messages):
     for m in messages:
         # print all files that are attached to a message
         for file in m['files']:
-            print(f"Date: {m['composetime'][:19]} - User: {m['imdisplayname']} - File: {file['fileName']} Path: {file['objectUrl']}")
+            print(
+                f"Date: {m['composetime'][:19]} - User: {m['imdisplayname']} - File: {file['fileName']} Path: {file['objectUrl']}")
 
 
 def parse_text_message(messages):
-
     messages.sort(key=lambda date: datetime.strptime(date['composetime'][:19], "%Y-%m-%dT%H:%M:%S"))
 
     # Dump messages into a json file
@@ -157,6 +167,7 @@ def parse_text_message(messages):
     # Print the text messages
     for f in messages:
         print(f"Compose Time: {f['composetime'][:19]} - User: {f['imdisplayname']} - Message: {f['content']}")
+
 
 def read_input(filepath):
     # Do some basic error handling
