@@ -39,6 +39,11 @@ def strip_html_tags(value):
         text = soup.get_text()
         # remove new lines
         text = text.rstrip("\n")
+        # remove junk
+        text = text.replace('\x00', '')
+        text = text.replace('\x01', '')
+        text = text.replace('\x02', '')
+        text = text.replace('\xa0', '')
         return text
     except:
         return value
@@ -67,7 +72,7 @@ def parse_db(filepath):
 
 
 def get_nested_data_structures(record):
-    nested_schemas = record.split(b'[{')[-1:]
+    nested_schemas = record.value.split(b'[{')[-1:]
     nested_schemas = nested_schemas[0].split(b'}]')[:-1]
     # Add search criteria back to the string to make list and dictionary structures complete again
     byte_str = b'[{' + nested_schemas[0] + b'}]'
@@ -75,15 +80,21 @@ def get_nested_data_structures(record):
     nested_dictionary = ast.literal_eval(byte_str.decode('utf-8'))
     return nested_dictionary
 
-# The problem is that some content such as href links dont work with the splitting algorithm
 def get_content(record):
-    try:
-        # Get the content record between content and renderContent keys
-        content = record.split(b'content"')[-1:]
-        content = content[0].split(b'"\rrenderContent"')[:-1]
-        return content[0][1::]
-    except:
-        return record
+    # This destinction is necessary, as chinese messages would not decode correctly
+    utf16_encoded = record.value.decode('utf-16', 'replace')
+    utf8_encoded = record.value.decode('utf-8', 'replace')
+
+    # UTF-16 messages
+    if b'"\x07contentc' in record.value:
+        content_utf16_encoded = utf16_encoded.split('</div>')[0]
+        content_utf16_encoded = content_utf16_encoded.split('<div>')[1]
+        return content_utf16_encoded
+    # UTF-8 Messages
+    elif b'"\x07content' in record.value:
+        content_utf8_encoded = utf8_encoded.split('"\rrenderContent')[0]
+        content_utf8_encoded = content_utf8_encoded.split('"\x07content')[1]
+        return content_utf8_encoded[2::]
 
 def determine_record_type(record):
     types = {
@@ -94,8 +105,7 @@ def determine_record_type(record):
         'media': {'identifier': {b'messagetype': 'Text'},
                   'fields': [b'messagetype', b'imdisplayname', b'composetime', b'files'], 'nested_schema': b'files'},
         'message': {'identifier': {b'messagetype': 'RichText/Html'},
-                    'fields': [b'messagetype', b'contenttype', b'imdisplayname', b'content', b'renderContent',
-                               b'clientmessageid', b'composetime', b'originalarrivaltime', b'clientArrivalTime'],
+                    'fields': [b'messagetype', b'contenttype', b'imdisplayname', b'clientmessageid', b'composetime', b'originalarrivaltime', b'clientArrivalTime'],
                     'nested_schema': None},
         'call': {'identifier': {b'messagetype': 'Event/Call'},
                  'fields': [b'messagetype', b'displayName', b'originalarrivaltime', b'clientArrivalTime'],
@@ -104,10 +114,10 @@ def determine_record_type(record):
     }
 
     for key in types:
-        if record.find(b'"') != -1:
+        if record.value.find(b'"') != -1:
             t = True
             cleaned_record = {}
-            key_values = record.split(b'"')
+            key_values = record.value.split(b'"')
             for i, field in enumerate(key_values):
                 # check if field is a key - ignore the first byte as it is usually junk
                 if field[1::] in types[key]['fields']:
@@ -129,7 +139,7 @@ def determine_record_type(record):
                 cleaned_record[b'type'] = key
                 if key == 'message':
                     # Patch the content of messages by specifically looking for divs
-                    cleaned_record[b'content'] = strip_html_tags(decode_value(get_content(record)))
+                    cleaned_record[b'content'] = strip_html_tags(get_content(record))
                 return cleaned_record
     # No type could be determined
     return None
@@ -139,18 +149,18 @@ def parse_records(fetched_ldb_records):
     # Split up records by message type
     cleaned_records = []
 
-    for f_byte in fetched_ldb_records:
-        record = determine_record_type(f_byte.value)
+    for fetched_record in fetched_ldb_records:
+        record = determine_record_type(fetched_record)
         if record is not None:
             # Decode the dict keys
             cleaned_record = {key.decode(): val for key, val in record.items()}
             # Include additional information about the database record, such as file origin, and the state
-            cleaned_record["origin_file"] = str(f_byte.origin_file)
-            cleaned_record["file_type"] = f_byte.file_type.name
-            cleaned_record["offset"] = f_byte.offset
-            cleaned_record["seq"] = f_byte.seq
-            cleaned_record["state"] = f_byte.state.name
-            cleaned_record["was_compressed"] = f_byte.was_compressed
+            cleaned_record["origin_file"] = str(fetched_record.origin_file)
+            cleaned_record["file_type"] = fetched_record.file_type.name
+            cleaned_record["offset"] = fetched_record.offset
+            cleaned_record["seq"] = fetched_record.seq
+            cleaned_record["state"] = fetched_record.state.name
+            cleaned_record["was_compressed"] = fetched_record.was_compressed
             cleaned_records.append(cleaned_record)
 
     # Filter by messages
