@@ -99,15 +99,23 @@ def get_content(record):
 
 def determine_record_type(record):
     message_types = {
-        'reaction_in_chat': {'identifier': {b'activityType': 'reactionInChat'},
-                             'fields': [b'activityType', b'messagetype', b'contenttype', b'activitySubtype',
+        'reaction_in_chat': {'identifier': {b'activityType': 'reactionInChat', b'contenttype': 'text'},
+                             'fields': [b'activityType', b'messagetype', b'contenttype', b'activitySubtype', b'originalarrivaltime',
                                         b'activityTimestamp', b'composetime', b'sourceUserImDisplayName']},
-        'plain': {'identifier': {b'messagetype': 'Text'},
-                  'fields': [b'messagetype', b'imdisplayname', b'composetime']},
+        'reaction': {'identifier': {b'activityType': 'reaction', b'contenttype': 'text'},
+                             'fields': [b'activityType', b'messagetype', b'contenttype', b'originalarrivaltime',
+                                        b'activityTimestamp', b'composetime', b'sourceUserImDisplayName']},
+        'reply': {'identifier': {b'activityType': 'reply', b'contenttype': 'text'},
+                             'fields': [b'activityType', b'messagetype', b'contenttype', b'messagePreview',
+                                        b'activityTimestamp', b'composetime', b'originalarrivaltime', b'sourceUserImDisplayName']},
         'message': {'identifier': {b'messagetype': 'RichText/Html'},
                     'fields': [b'messagetype', b'contenttype', b'imdisplayname', b'clientmessageid', b'composetime', b'originalarrivaltime', b'clientArrivalTime']},
+        'message_deleted': {'identifier': {b'messagetype': 'Text', b'contenttype': 'text'},
+                    'fields': [b'messagetype', b'contenttype', b'imdisplayname', b'clientmessageid', b'composetime', b'originalarrivaltime', b'clientArrivalTime', b'deletetime']},
         'call': {'identifier': {b'messagetype': 'Event/Call'},
-                 'fields': [b'messagetype', b'displayName', b'originalarrivaltime', b'clientArrivalTime']}
+                 'fields': [b'messagetype', b'displayName', b'originalarrivaltime', b'clientArrivalTime']},
+        'plain': {'identifier': {b'messagetype': 'Text'},
+                  'fields': [b'messagetype', b'imdisplayname', b'composetime']}
 
     }
     # Lets identify nested schemas based the the schema type
@@ -167,7 +175,6 @@ def parse_records(fetched_ldb_records):
             cleaned_record["state"] = fetched_record.state.name
             cleaned_record["was_compressed"] = fetched_record.was_compressed
             cleaned_records.append(cleaned_record)
-            print(cleaned_record)
 
     # Filter by messages
     #messages = [d for d in cleaned_records if d['type'] == 'message']
@@ -177,9 +184,9 @@ def parse_records(fetched_ldb_records):
     # reactions = [d for d in cleaned_records if d['type'] == 'reaction_in_chat']
     # parse_message_reaction(reactions)
     #
-    # Filter by media messages
-    # media_messages = [d for d in cleaned_records if d['type'] == 'media']
-    # parse_media_messages(media_messages)
+
+    replies = [d for d in cleaned_records if d['type'] == 'message_deleted']
+    print(replies)
 
 
 def parse_message_reaction(messages):
