@@ -124,6 +124,13 @@ def parse_records(fetched_ldb_records):
         if record is not None:
             # Decode the dict keys
             cleaned_record = {key.decode(): val for key, val in record.items()}
+            # Include some information about the database record, such as file origin, and the state
+            cleaned_record["origin_file"] = str(f_byte.origin_file)
+            cleaned_record["file_type"] = f_byte.file_type.name
+            cleaned_record["offset"] = f_byte.offset
+            cleaned_record["seq"] = f_byte.seq
+            cleaned_record["state"] = f_byte.state.name
+            cleaned_record["was_compressed"] = f_byte.was_compressed
             cleaned_records.append(cleaned_record)
 
     # Filter by messages
@@ -143,8 +150,8 @@ def parse_message_reaction(messages):
     messages.sort(key=lambda date: datetime.strptime(date['composetime'][:19], "%Y-%m-%dT%H:%M:%S"))
 
     # TODO Show messages (id), which the user responded to
-    for f in messages:
-        print(f"Date: {f['composetime'][:19]} - User: {f['sourceUserImDisplayName']} - Liked Message in Chat")
+    for m in messages:
+        print(f"Date: {m['composetime'][:19]} - User: {m['sourceUserImDisplayName']} - Liked Message in Chat")
 
 
 def parse_media_messages(messages):
@@ -165,8 +172,8 @@ def parse_text_message(messages):
         json.dump(messages, f)
 
     # Print the text messages
-    for f in messages:
-        print(f"Compose Time: {f['composetime'][:19]} - User: {f['imdisplayname']} - Message: {f['content']}")
+    for m in messages:
+        print(f"Compose Time: {m['composetime'][:19]} - User: {m['imdisplayname']} - Message: {m['content']}")
 
 
 def read_input(filepath):
