@@ -3,6 +3,7 @@ import json
 import re
 from datetime import datetime
 from pathlib import Path
+from bs4 import BeautifulSoup
 
 import click
 import pyfiglet
@@ -12,26 +13,33 @@ from ccl_chrome_indexeddb import ccl_leveldb
 ENCODING = "iso-8859-1"
 
 
+
 def decode_value(b):
     # Cut off some unwanted HEX bytes
     try:
         b = b.replace(b'\x00', b'')
         b = b.replace(b'\x01', b'')
         b = b.replace(b'\x02', b'')
+        b = b.replace(b'\xa0', b'')
         value = b.decode()
 
     except UnicodeDecodeError:
         try:
-            value = b.decode('utf-16')
+            value = b.decode('utf-8')
         except Exception:
             value = str(b)
     return value
 
 
 def strip_html_tags(value):
+
     try:
-        value = re.findall(r'<div>(.*)</div>', value)[0]
-        return value
+        # Get the text of any embedded html, such as divs, a href links
+        soup = BeautifulSoup(value, features="html.parser")
+        text = soup.get_text()
+        # remove new lines
+        text = text.rstrip("\n")
+        return text
     except:
         return value
 
@@ -67,6 +75,15 @@ def get_nested_data_structures(record):
     nested_dictionary = ast.literal_eval(byte_str.decode('utf-8'))
     return nested_dictionary
 
+# The problem is that some content such as href links dont work with the splitting algorithm
+def get_content(record):
+    try:
+        # Get the content record between content and renderContent keys
+        content = record.split(b'content"')[-1:]
+        content = content[0].split(b'"\rrenderContent"')[:-1]
+        return content[0][1::]
+    except:
+        return record
 
 def determine_record_type(record):
     types = {
@@ -110,6 +127,9 @@ def determine_record_type(record):
             # Lets only consider the entries that are complete and that have a valid content type
             if t and all(c in cleaned_record for c in types[key]['fields']):
                 cleaned_record[b'type'] = key
+                if key == 'message':
+                    # Patch the content of messages by specifically looking for divs
+                    cleaned_record[b'content'] = strip_html_tags(decode_value(get_content(record)))
                 return cleaned_record
     # No type could be determined
     return None
@@ -124,7 +144,7 @@ def parse_records(fetched_ldb_records):
         if record is not None:
             # Decode the dict keys
             cleaned_record = {key.decode(): val for key, val in record.items()}
-            # Include some information about the database record, such as file origin, and the state
+            # Include additional information about the database record, such as file origin, and the state
             cleaned_record["origin_file"] = str(f_byte.origin_file)
             cleaned_record["file_type"] = f_byte.file_type.name
             cleaned_record["offset"] = f_byte.offset
