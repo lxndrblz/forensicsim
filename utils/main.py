@@ -1,17 +1,15 @@
 import ast
 import json
-import re
 from datetime import datetime
 from pathlib import Path
-from bs4 import BeautifulSoup
 
 import click
 import pyfiglet
+from bs4 import BeautifulSoup
 
 from ccl_chrome_indexeddb import ccl_leveldb
 
 ENCODING = "iso-8859-1"
-
 
 
 def decode_value(b):
@@ -32,7 +30,6 @@ def decode_value(b):
 
 
 def strip_html_tags(value):
-
     try:
         # Get the text of any embedded html, such as divs, a href links
         soup = BeautifulSoup(value, features="html.parser")
@@ -73,13 +70,16 @@ def parse_db(filepath):
 
 
 def get_nested_data_structures(record, schema):
-    nested_schemas = record.value.split(b'[{'+schema)[-1:]
+    nested_schemas = record.value.split(b'[{' + schema)[-1:]
     nested_schemas = nested_schemas[0].split(b'}]')[:-1]
     # Add search criteria back to the string to make list and dictionary structures complete again
-    byte_str = b'[{'+schema + nested_schemas[0] + b'}]'
+    byte_str = b'[{' + schema + nested_schemas[0] + b'}]'
     # turn the byte string into a Python list with dictionaries
-    nested_dictionary = ast.literal_eval(byte_str.decode('utf-8'))
+    content_utf8_encoded = byte_str.decode('utf-8')
+    content_utf8_encoded = replace_literal(content_utf8_encoded)
+    nested_dictionary = ast.literal_eval(content_utf8_encoded)
     return nested_dictionary
+
 
 def get_content(record):
     # This destinction is necessary, as chinese messages would not decode correctly
@@ -97,21 +97,48 @@ def get_content(record):
         content_utf8_encoded = content_utf8_encoded.split('"\x07content')[1]
         return content_utf8_encoded[2::]
 
+
+def replace_literal(record):
+    record = record.replace(":null", ":None")
+    record = record.replace(":false", ":False")
+    record = record.replace(":true", ":True")
+    return record
+
+
+def get_meeting(record):
+    utf8_encoded = record.value.decode('utf-8', 'replace')
+    # grep the meeting json
+    content_utf8_encoded = utf8_encoded.split('"\x07meeting"')[1]
+    content_utf8_encoded = content_utf8_encoded.split('"\nthreadType')[0]
+    # replace null with null, false and true otherwise it throws an error
+    content_utf8_encoded = replace_literal(content_utf8_encoded)
+    # Convert string into a dictionary, skip the first two byte
+    return ast.literal_eval(content_utf8_encoded[2::])
+
+
 def determine_record_type(record):
     message_types = {
+        'meeting': {'identifier': {b'type': 'Meeting', b'messagetype': 'ThreadActivity/AddMember'},
+                    'fields': [b'type', b'messagetype', b'id', b'composetime', b'originalarrivaltime',
+                               b'clientArrivalTime', b'cachedDeduplicationKey']},
         'reaction_in_chat': {'identifier': {b'activityType': 'reactionInChat', b'contenttype': 'text'},
-                             'fields': [b'activityType', b'messagetype', b'contenttype', b'activitySubtype', b'originalarrivaltime',
+                             'fields': [b'activityType', b'messagetype', b'contenttype', b'activitySubtype',
+                                        b'originalarrivaltime',
                                         b'activityTimestamp', b'composetime', b'sourceUserImDisplayName']},
         'reaction': {'identifier': {b'activityType': 'reaction', b'contenttype': 'text'},
-                             'fields': [b'activityType', b'messagetype', b'contenttype', b'originalarrivaltime',
-                                        b'activityTimestamp', b'composetime', b'sourceUserImDisplayName']},
+                     'fields': [b'activityType', b'messagetype', b'contenttype', b'originalarrivaltime',
+                                b'activityTimestamp', b'composetime', b'sourceUserImDisplayName']},
         'reply': {'identifier': {b'activityType': 'reply', b'contenttype': 'text'},
-                             'fields': [b'activityType', b'messagetype', b'contenttype', b'messagePreview',
-                                        b'activityTimestamp', b'composetime', b'originalarrivaltime', b'sourceUserImDisplayName']},
-        'message': {'identifier': {b'messagetype': 'RichText/Html', b'messageKind':'skypeMessageLocal', b'contenttype':'text'},
-                    'fields': [b'conversationId', b'messagetype', b'contenttype', b'imdisplayname', b'userPrincipalName', b'clientmessageid', b'composetime', b'originalarrivaltime', b'clientArrivalTime', b'cachedDeduplicationKey']},
+                  'fields': [b'activityType', b'messagetype', b'contenttype', b'messagePreview',
+                             b'activityTimestamp', b'composetime', b'originalarrivaltime', b'sourceUserImDisplayName']},
+        'message': {'identifier': {b'messagetype': 'RichText/Html', b'messageKind': 'skypeMessageLocal',
+                                   b'contenttype': 'text'},
+                    'fields': [b'conversationId', b'messagetype', b'contenttype', b'imdisplayname',
+                               b'userPrincipalName', b'clientmessageid', b'composetime', b'originalarrivaltime',
+                               b'clientArrivalTime', b'cachedDeduplicationKey']},
         'message_deleted': {'identifier': {b'messagetype': 'Text', b'contenttype': 'text'},
-                    'fields': [b'messagetype', b'contenttype', b'imdisplayname', b'clientmessageid', b'composetime', b'originalarrivaltime', b'clientArrivalTime', b'deletetime']},
+                            'fields': [b'messagetype', b'contenttype', b'imdisplayname', b'clientmessageid',
+                                       b'composetime', b'originalarrivaltime', b'clientArrivalTime', b'deletetime']},
         'call': {'identifier': {b'messagetype': 'Event/Call'},
                  'fields': [b'messagetype', b'displayName', b'originalarrivaltime', b'clientArrivalTime']},
         'plain': {'identifier': {b'messagetype': 'Text'},
@@ -120,7 +147,7 @@ def determine_record_type(record):
     # Lets identify nested schemas based the the schema type
     # TODO implement Hyplinks Type
     nested_schema = {
-        # 'hyperlinks': {'identifier': b'"@type":"http://schema.skype.com/HyperLink"'},
+        'hyperlinks': {'identifier': b'"@type":"http://schema.skype.com/HyperLink"'},
         'files': {'identifier': b'"@type":"http://schema.skype.com/File"'}
     }
 
@@ -129,16 +156,19 @@ def determine_record_type(record):
             t = True
             cleaned_record = {}
             key_values = record.value.split(b'"')
+
             for i, field in enumerate(key_values):
                 # check if field is a key - ignore the first byte as it is usually junk
-                if field[1::] in message_types[key]['fields']:
+                # Only add each key only once
+                if field[1::] in message_types[key]['fields'] and field[1::] not in cleaned_record:
                     # use current field as key, use next field as value
                     cleaned_record[field[1::]] = strip_html_tags(decode_value(key_values[i + 1][1::]))
             # Get nested schemas, such as files or hyperlinks, could be both
             cleaned_record[b'nested_content'] = []
             for schema in nested_schema:
                 if nested_schema[schema]['identifier'] in record.value:
-                    cleaned_record[b'nested_content'].append(get_nested_data_structures(record, nested_schema[schema]['identifier']))
+                    cleaned_record[b'nested_content'].append(
+                        get_nested_data_structures(record, nested_schema[schema]['identifier']))
 
             # Determine the message type by checking if the identifiers match
             for identifier_key in message_types[key]['identifier']:
@@ -152,6 +182,9 @@ def determine_record_type(record):
                 if key == 'message':
                     # Patch the content of messages by specifically looking for divs
                     cleaned_record[b'content'] = strip_html_tags(get_content(record))
+                if key == 'meeting':
+                    meeting_details = get_meeting(record)
+                    cleaned_record[b'content'] = meeting_details
                 return cleaned_record
     # No type could be determined
     return None
@@ -178,8 +211,12 @@ def parse_records(fetched_ldb_records):
     # Filter by messages
     messages = [d for d in cleaned_records if d['type'] == 'message']
 
+    # Filter by meetings
+    # messages = [d for d in cleaned_records if d['type'] == 'meeting']
+
     # Remove duplicates based on their deduplication key
-    messages = [i for n, i in enumerate(messages) if i.get('cachedDeduplicationKey') not in [y.get('cachedDeduplicationKey') for y in messages[n + 1:]]]
+    messages = [i for n, i in enumerate(messages) if
+                i.get('cachedDeduplicationKey') not in [y.get('cachedDeduplicationKey') for y in messages[n + 1:]]]
 
     # Filter by reactions
     # reactions = [d for d in cleaned_records if d['type'] == 'reaction_in_chat']
