@@ -131,8 +131,7 @@ def determine_record_type(record):
         'reply': {'identifier': {b'activityType': 'reply', b'contenttype': 'text'},
                   'fields': [b'activityType', b'messagetype', b'contenttype', b'messagePreview',
                              b'activityTimestamp', b'composetime', b'originalarrivaltime', b'sourceUserImDisplayName']},
-        'message': {'identifier': {b'messagetype': 'RichText/Html', b'messageKind': 'skypeMessageLocal',
-                                   b'contenttype': 'text'},
+        'message': {'identifier': {b'messageKind': 'skypeMessageLocal', b'contenttype': 'text'},
                     'fields': [b'conversationId', b'messagetype', b'contenttype', b'imdisplayname',
                                b'userPrincipalName', b'clientmessageid', b'composetime', b'originalarrivaltime',
                                b'clientArrivalTime', b'cachedDeduplicationKey']},
@@ -140,9 +139,7 @@ def determine_record_type(record):
                             'fields': [b'messagetype', b'contenttype', b'imdisplayname', b'clientmessageid',
                                        b'composetime', b'originalarrivaltime', b'clientArrivalTime', b'deletetime']},
         'call': {'identifier': {b'messagetype': 'Event/Call'},
-                 'fields': [b'messagetype', b'displayName', b'originalarrivaltime', b'clientArrivalTime']},
-        'plain': {'identifier': {b'messagetype': 'Text'},
-                  'fields': [b'messagetype', b'imdisplayname', b'composetime']}
+                 'fields': [b'messagetype', b'displayName', b'originalarrivaltime', b'clientArrivalTime']}
     }
     # Lets identify nested schemas based the the schema type
     # TODO implement Hyplinks Type
@@ -209,14 +206,14 @@ def parse_records(fetched_ldb_records):
             cleaned_records.append(cleaned_record)
 
     # Filter by messages
-    messages = [d for d in cleaned_records if d['type'] == 'message']
+    # messages = [d for d in cleaned_records if d['type'] == 'message']
 
     # Filter by meetings
     # messages = [d for d in cleaned_records if d['type'] == 'meeting']
 
     # Remove duplicates based on their deduplication key
-    messages = [i for n, i in enumerate(messages) if
-                i.get('cachedDeduplicationKey') not in [y.get('cachedDeduplicationKey') for y in messages[n + 1:]]]
+    messages = [i for n, i in enumerate(cleaned_records) if
+                i.get('cachedDeduplicationKey') not in [y.get('cachedDeduplicationKey') for y in cleaned_records[n + 1:]]]
 
     # Filter by reactions
     # reactions = [d for d in cleaned_records if d['type'] == 'reaction_in_chat']
