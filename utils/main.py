@@ -108,15 +108,14 @@ def determine_record_type(record):
         'reply': {'identifier': {b'activityType': 'reply', b'contenttype': 'text'},
                              'fields': [b'activityType', b'messagetype', b'contenttype', b'messagePreview',
                                         b'activityTimestamp', b'composetime', b'originalarrivaltime', b'sourceUserImDisplayName']},
-        'message': {'identifier': {b'messagetype': 'RichText/Html'},
-                    'fields': [b'messagetype', b'contenttype', b'imdisplayname', b'clientmessageid', b'composetime', b'originalarrivaltime', b'clientArrivalTime']},
+        'message': {'identifier': {b'messagetype': 'RichText/Html', b'messageKind':'skypeMessageLocal', b'contenttype':'text'},
+                    'fields': [b'conversationId', b'messagetype', b'contenttype', b'imdisplayname', b'userPrincipalName', b'clientmessageid', b'composetime', b'originalarrivaltime', b'clientArrivalTime', b'cachedDeduplicationKey']},
         'message_deleted': {'identifier': {b'messagetype': 'Text', b'contenttype': 'text'},
                     'fields': [b'messagetype', b'contenttype', b'imdisplayname', b'clientmessageid', b'composetime', b'originalarrivaltime', b'clientArrivalTime', b'deletetime']},
         'call': {'identifier': {b'messagetype': 'Event/Call'},
                  'fields': [b'messagetype', b'displayName', b'originalarrivaltime', b'clientArrivalTime']},
         'plain': {'identifier': {b'messagetype': 'Text'},
                   'fields': [b'messagetype', b'imdisplayname', b'composetime']}
-
     }
     # Lets identify nested schemas based the the schema type
     # TODO implement Hyplinks Type
@@ -177,7 +176,7 @@ def parse_records(fetched_ldb_records):
             cleaned_records.append(cleaned_record)
 
     # Filter by messages
-    #messages = [d for d in cleaned_records if d['type'] == 'message']
+    messages = [d for d in cleaned_records if d['type'] == 'message']
     #parse_text_message(messages)
 
     # Filter by reactions
@@ -185,8 +184,12 @@ def parse_records(fetched_ldb_records):
     # parse_message_reaction(reactions)
     #
 
-    replies = [d for d in cleaned_records if d['type'] == 'message_deleted']
-    print(replies)
+    # Filter for deleted messages
+    # replies = [d for d in cleaned_records if d['type'] == 'message_deleted']
+    # print(replies)
+
+    # Write results to JSON to process these in Autopsy
+    write_results_to_json(messages)
 
 
 def parse_message_reaction(messages):
@@ -210,13 +213,15 @@ def parse_media_messages(messages):
 def parse_text_message(messages):
     messages.sort(key=lambda date: datetime.strptime(date['composetime'][:19], "%Y-%m-%dT%H:%M:%S"))
 
-    # Dump messages into a json file
-    with open('messages.json', 'w') as f:
-        json.dump(messages, f)
-
     # Print the text messages
     for m in messages:
         print(f"Compose Time: {m['composetime'][:19]} - User: {m['imdisplayname']} - Message: {m['content']}")
+
+
+def write_results_to_json(data):
+    # Dump messages into a json file
+    with open('teams.json', 'w') as f:
+        json.dump(data, f)
 
 
 def read_input(filepath):

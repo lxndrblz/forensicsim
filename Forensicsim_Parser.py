@@ -182,9 +182,8 @@ class ForensicIMIngestModule(DataSourceIngestModule):
         # We will use the integrated add message function to add a TSK_MESSAGE
         # http://sleuthkit.org/autopsy/docs/api-docs/4.12.0//classorg_1_1sleuthkit_1_1autopsy_1_1coreutils_1_1_app_d_b_parser_helper.html#a630bb70bee171df941e363693a1795f3
 
-        message_type = "Microsoft Teams"
-        # TODO Fix addresses
-        from_address = ""
+        message_type = "Microsoft Teams (Direct Message)"
+        from_address = message["userPrincipalName"]
         to_address = ""
         subject = ""
         message_text = message["content"]
@@ -192,8 +191,8 @@ class ForensicIMIngestModule(DataSourceIngestModule):
         dt = datetime.strptime(message['composetime'][:19], "%Y-%m-%dT%H:%M:%S")
         time_struct = dt.timetuple()
         timestamp = int(calendar.timegm(time_struct))
-        # TODO Fix Thread id
-        thread_id = message["clientmessageid"]
+        # Group by the conversationId, these can be direct messages, but also posts
+        thread_id = message["conversationId"]
         # TODO Fix direction
         direction = CommunicationDirection.UNKNOWN
 
