@@ -115,6 +115,16 @@ def get_meeting(record):
     # Convert string into a dictionary, skip the first two byte
     return ast.literal_eval(content_utf8_encoded[2::])
 
+def get_emotion(record):
+    utf8_encoded = record.value.decode('utf-8', 'replace')
+    # grep the meeting json
+    content_utf8_encoded = utf8_encoded.split('"\x08emotionso"')[1]
+    content_utf8_encoded = content_utf8_encoded.split('I\x02{')[0]
+    # replace null with null, false and true otherwise it throws an error
+    content_utf8_encoded = replace_literal(content_utf8_encoded)
+    # Convert string into a dictionary, skip the first two byte
+    print(content_utf8_encoded[1::])
+    return content_utf8_encoded[1::]
 
 def determine_record_type(record):
     message_types = {
@@ -127,7 +137,7 @@ def determine_record_type(record):
                                         b'activityTimestamp', b'composetime', b'sourceUserImDisplayName']},
         'reaction': {'identifier': {b'activityType': 'reaction', b'contenttype': 'text'},
                      'fields': [b'activityType', b'messagetype', b'contenttype', b'originalarrivaltime',
-                                b'activityTimestamp', b'composetime', b'sourceUserImDisplayName']},
+                                b'activityTimestamp', b'composetime', b'sourceUserImDisplayName', b'activitySubtype']},
         'reply': {'identifier': {b'activityType': 'reply', b'contenttype': 'text'},
                   'fields': [b'activityType', b'messagetype', b'contenttype', b'messagePreview',
                              b'activityTimestamp', b'composetime', b'originalarrivaltime', b'sourceUserImDisplayName']},
@@ -179,6 +189,14 @@ def determine_record_type(record):
                 if key == 'message':
                     # Patch the content of messages by specifically looking for divs
                     cleaned_record[b'content'] = strip_html_tags(get_content(record))
+
+                # Check for emotions such as likes, hearts, grumpy face
+                if b'\x08emotionso' in key_values:
+                    cleaned_record[b'emotion'] = get_emotion(record)
+                else:
+                    cleaned_record[b'emotion'] = None
+
+
                 if key == 'meeting':
                     meeting_details = get_meeting(record)
                     cleaned_record[b'content'] = meeting_details
