@@ -177,7 +177,9 @@ def parse_records(fetched_ldb_records):
 
     # Filter by messages
     messages = [d for d in cleaned_records if d['type'] == 'message']
-    #parse_text_message(messages)
+
+    # Remove duplicates based on their deduplication key
+    messages = [i for n, i in enumerate(messages) if i.get('cachedDeduplicationKey') not in [y.get('cachedDeduplicationKey') for y in messages[n + 1:]]]
 
     # Filter by reactions
     # reactions = [d for d in cleaned_records if d['type'] == 'reaction_in_chat']
