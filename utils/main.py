@@ -123,8 +123,17 @@ def get_emotion(record):
     # replace null with null, false and true otherwise it throws an error
     content_utf8_encoded = replace_literal(content_utf8_encoded)
     # Convert string into a dictionary, skip the first two byte
-    print(content_utf8_encoded[1::])
     return content_utf8_encoded[1::]
+
+def get_call(record):
+    utf8_encoded = record.value.decode('utf-8', 'replace')
+    # grep the meeting json
+    content_utf8_encoded = utf8_encoded.split('"\x08call-log"')[1]
+    content_utf8_encoded = content_utf8_encoded.split('"\x0es2spartnername')[0]
+    # replace null with null, false and true otherwise it throws an error
+    content_utf8_encoded = replace_literal(content_utf8_encoded)
+    # Convert string into a dictionary, skip the first two byte
+    return ast.literal_eval(content_utf8_encoded[2::])
 
 def determine_record_type(record):
     message_types = {
@@ -148,8 +157,8 @@ def determine_record_type(record):
         'message_deleted': {'identifier': {b'messagetype': 'Text', b'contenttype': 'text'},
                             'fields': [b'messagetype', b'contenttype', b'imdisplayname', b'clientmessageid',
                                        b'composetime', b'originalarrivaltime', b'clientArrivalTime', b'deletetime']},
-        'call': {'identifier': {b'messagetype': 'Event/Call'},
-                 'fields': [b'messagetype', b'displayName', b'originalarrivaltime', b'clientArrivalTime']}
+        'call_log': {'identifier': {b'messagetype': 'RichText/Html', b'contenttype': 'text'},
+                 'fields': [b'messagetype', b'originalarrivaltime', b'clientArrivalTime', b'clientmessageid', b'composetime', b'originalarrivaltime', b'clientArrivalTime', b'call-log']}
     }
     # Lets identify nested schemas based the the schema type
     # TODO implement Hyplinks Type
@@ -196,11 +205,17 @@ def determine_record_type(record):
                 else:
                     cleaned_record[b'emotion'] = None
 
-
+                # Do some further processing for message types that have nested JSONs, but not schemas.
                 if key == 'meeting':
                     meeting_details = get_meeting(record)
                     cleaned_record[b'content'] = meeting_details
+                elif key == 'call_log':
+                    call_details = get_call(record)
+                    cleaned_record[b'content'] = call_details
+
                 return cleaned_record
+
+
     # No type could be determined
     return None
 
@@ -227,11 +242,11 @@ def parse_records(fetched_ldb_records):
     # messages = [d for d in cleaned_records if d['type'] == 'message']
 
     # Filter by meetings
-    # messages = [d for d in cleaned_records if d['type'] == 'meeting']
+    messages = [d for d in cleaned_records if d['type'] == 'call_log']
 
     # Remove duplicates based on their deduplication key
-    messages = [i for n, i in enumerate(cleaned_records) if
-                i.get('cachedDeduplicationKey') not in [y.get('cachedDeduplicationKey') for y in cleaned_records[n + 1:]]]
+    # messages = [i for n, i in enumerate(cleaned_records) if
+    #             i.get('cachedDeduplicationKey') not in [y.get('cachedDeduplicationKey') for y in cleaned_records[n + 1:]]]
 
     # Filter by reactions
     # reactions = [d for d in cleaned_records if d['type'] == 'reaction_in_chat']
