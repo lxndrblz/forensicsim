@@ -1,6 +1,7 @@
 import ast
 import json
 from datetime import datetime
+from datetime import date
 from pathlib import Path
 
 import click
@@ -115,6 +116,17 @@ def get_meeting(record):
     # Convert string into a dictionary, skip the first two byte
     return ast.literal_eval(content_utf8_encoded[2::])
 
+def get_call(record):
+    utf8_encoded = record.value.decode('utf-8', 'replace')
+    # grep the meeting json
+    content_utf8_encoded = utf8_encoded.split('"\x08call-log"')[1]
+    content_utf8_encoded = content_utf8_encoded.split('"\x0es2spartnername')[0]
+    # replace null with null, false and true otherwise it throws an error
+    content_utf8_encoded = replace_literal(content_utf8_encoded)
+    # Convert string into a dictionary, skip the first two byte
+    return ast.literal_eval(content_utf8_encoded[2::])
+
+
 def get_emotion(record):
     utf8_encoded = record.value.decode('utf-8', 'replace')
     # grep the meeting json
@@ -125,15 +137,18 @@ def get_emotion(record):
     # Convert string into a dictionary, skip the first two byte
     return content_utf8_encoded[1::]
 
-def get_call(record):
+def get_delete_time(record):
     utf8_encoded = record.value.decode('utf-8', 'replace')
     # grep the meeting json
-    content_utf8_encoded = utf8_encoded.split('"\x08call-log"')[1]
-    content_utf8_encoded = content_utf8_encoded.split('"\x0es2spartnername')[0]
+    content_utf8_encoded = utf8_encoded.split('"\ndeletetime"')[1]
+    content_utf8_encoded = content_utf8_encoded.split('"\nimportanceI')[0]
     # replace null with null, false and true otherwise it throws an error
-    content_utf8_encoded = replace_literal(content_utf8_encoded)
-    # Convert string into a dictionary, skip the first two byte
-    return ast.literal_eval(content_utf8_encoded[2::])
+    # timestamp appear in epoch format with milliseconds alias currentmillis
+    # Convert data to neat timestamp
+    delete_time_datetime = datetime.utcfromtimestamp(int(content_utf8_encoded)/1000)
+    delete_time_string = delete_time_datetime.strftime('%Y-%m-%dT%H:%M:%S.%f')
+
+    return str(delete_time_string)
 
 def determine_record_type(record):
     message_types = {
@@ -154,9 +169,6 @@ def determine_record_type(record):
                     'fields': [b'conversationId', b'messagetype', b'contenttype', b'imdisplayname',
                                b'userPrincipalName', b'clientmessageid', b'composetime', b'originalarrivaltime',
                                b'clientArrivalTime', b'cachedDeduplicationKey']},
-        'message_deleted': {'identifier': {b'messagetype': 'Text', b'contenttype': 'text'},
-                            'fields': [b'messagetype', b'contenttype', b'imdisplayname', b'clientmessageid',
-                                       b'composetime', b'originalarrivaltime', b'clientArrivalTime', b'deletetime']},
         'call_log': {'identifier': {b'messagetype': 'RichText/Html', b'contenttype': 'text'},
                  'fields': [b'messagetype', b'originalarrivaltime', b'clientArrivalTime', b'clientmessageid', b'composetime', b'originalarrivaltime', b'clientArrivalTime', b'call-log']}
     }
@@ -195,15 +207,23 @@ def determine_record_type(record):
             # Lets only consider the entries that are complete and that have a valid content type
             if t and all(c in cleaned_record for c in message_types[key]['fields']):
                 cleaned_record[b'type'] = key
-                if key == 'message':
-                    # Patch the content of messages by specifically looking for divs
-                    cleaned_record[b'content'] = strip_html_tags(get_content(record))
+
 
                 # Check for emotions such as likes, hearts, grumpy face
                 if b'\x08emotionso' in key_values:
                     cleaned_record[b'emotion'] = get_emotion(record)
                 else:
                     cleaned_record[b'emotion'] = None
+
+                # Mark a record as deleted
+                if b'\ndeletetime' in key_values:
+                    cleaned_record[b'deleted'] = get_delete_time(record)
+                else:
+                    cleaned_record[b'deleted'] = None
+
+                if key == 'message':
+                    # Patch the content of messages by specifically looking for divs
+                    cleaned_record[b'content'] = strip_html_tags(get_content(record))
 
                 # Do some further processing for message types that have nested JSONs, but not schemas.
                 if key == 'meeting':
@@ -239,10 +259,8 @@ def parse_records(fetched_ldb_records):
             cleaned_records.append(cleaned_record)
 
     # Filter by messages
-    # messages = [d for d in cleaned_records if d['type'] == 'message']
+    messages = [d for d in cleaned_records if d['type'] == 'message']
 
-    # Filter by meetings
-    messages = [d for d in cleaned_records if d['type'] == 'call_log']
 
     # Remove duplicates based on their deduplication key
     # messages = [i for n, i in enumerate(cleaned_records) if
