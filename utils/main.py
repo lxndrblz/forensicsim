@@ -48,7 +48,7 @@ def strip_html_tags(value):
         return value
 
 
-def parse_db(filepath):
+def parse_db(filepath, outputpath):
     fetched_ldb_records = []
     try:
         db = ccl_leveldb.RawLevelDb(filepath)
@@ -67,11 +67,11 @@ def parse_db(filepath):
     # Close the database
     db.close()
     print(f'Reading {len(fetched_ldb_records)} Local Storage raw LevelDB records; beginning parsing')
-    parse_records(fetched_ldb_records)
+    parse_records(fetched_ldb_records, outputpath)
 
 
 def get_nested_data_structures(record, schema):
-    nested_schemas = record.value.split(b'[{' + schema)[-1:]
+    nested_schemas = record.split(b'[{' + schema)[-1:]
     nested_schemas = nested_schemas[0].split(b'}]')[:-1]
     # Add search criteria back to the string to make list and dictionary structures complete again
     byte_str = b'[{' + schema + nested_schemas[0] + b'}]'
@@ -84,16 +84,16 @@ def get_nested_data_structures(record, schema):
 
 def get_content(record):
     # This destinction is necessary, as chinese messages would not decode correctly
-    utf16_encoded = record.value.decode('utf-16', 'replace')
-    utf8_encoded = record.value.decode('utf-8', 'replace')
+    utf16_encoded = record.decode('utf-16', 'replace')
+    utf8_encoded = record.decode('utf-8', 'replace')
 
     # UTF-16 messages
-    if b'"\x07contentc' in record.value:
+    if b'"\x07contentc' in record:
         content_utf16_encoded = utf16_encoded.split('</div>')[0]
         content_utf16_encoded = content_utf16_encoded.split('<div>')[1]
         return content_utf16_encoded
     # UTF-8 Messages
-    elif b'"\x07content' in record.value:
+    elif b'"\x07content' in record:
         content_utf8_encoded = utf8_encoded.split('"\rrenderContent')[0]
         content_utf8_encoded = content_utf8_encoded.split('"\x07content')[1]
         return content_utf8_encoded[2::]
@@ -107,7 +107,7 @@ def replace_literal(record):
 
 
 def get_meeting(record):
-    utf8_encoded = record.value.decode('utf-8', 'replace')
+    utf8_encoded = record.decode('utf-8', 'replace')
     # grep the meeting json
     content_utf8_encoded = utf8_encoded.split('"\x07meeting"')[1]
     content_utf8_encoded = content_utf8_encoded.split('"\nthreadType')[0]
@@ -117,7 +117,7 @@ def get_meeting(record):
     return ast.literal_eval(content_utf8_encoded[2::])
 
 def get_call(record):
-    utf8_encoded = record.value.decode('utf-8', 'replace')
+    utf8_encoded = record.decode('utf-8', 'replace')
     # grep the meeting json
     content_utf8_encoded = utf8_encoded.split('"\x08call-log"')[1]
     content_utf8_encoded = content_utf8_encoded.split('"\x0es2spartnername')[0]
@@ -128,7 +128,7 @@ def get_call(record):
 
 
 def get_emotion(record):
-    utf8_encoded = record.value.decode('utf-8', 'replace')
+    utf8_encoded = record.decode('utf-8', 'replace')
     # grep the meeting json
     content_utf8_encoded = utf8_encoded.split('"\x08emotionso"')[1]
     content_utf8_encoded = content_utf8_encoded.split('I\x02{')[0]
@@ -138,7 +138,7 @@ def get_emotion(record):
     return content_utf8_encoded[1::]
 
 def get_delete_time(record):
-    utf8_encoded = record.value.decode('utf-8', 'replace')
+    utf8_encoded = record.decode('utf-8', 'replace')
     # grep the meeting json
     content_utf8_encoded = utf8_encoded.split('"\ndeletetime"')[1]
     content_utf8_encoded = content_utf8_encoded.split('"\nimportanceI')[0]
@@ -167,104 +167,119 @@ def determine_record_type(record):
                              b'activityTimestamp', b'composetime', b'originalarrivaltime', b'sourceUserImDisplayName']},
         'message': {'identifier': {b'messageKind': 'skypeMessageLocal', b'contenttype': 'text'},
                     'fields': [b'conversationId', b'messagetype', b'contenttype', b'imdisplayname',
-                               b'userPrincipalName', b'clientmessageid', b'composetime', b'originalarrivaltime',
+                               b'clientmessageid', b'composetime', b'originalarrivaltime',
                                b'clientArrivalTime', b'cachedDeduplicationKey']},
         'call_log': {'identifier': {b'messagetype': 'RichText/Html', b'contenttype': 'text'},
                  'fields': [b'messagetype', b'originalarrivaltime', b'clientArrivalTime', b'clientmessageid', b'composetime', b'originalarrivaltime', b'clientArrivalTime', b'call-log']}
     }
     # Lets identify nested schemas based the the schema type
-    # TODO implement Hyplinks Type
     nested_schema = {
         'hyperlinks': {'identifier': b'"@type":"http://schema.skype.com/HyperLink"'},
         'files': {'identifier': b'"@type":"http://schema.skype.com/File"'}
     }
 
-    for key in message_types:
-        if record.value.find(b'"') != -1:
-            t = True
-            cleaned_record = {}
-            key_values = record.value.split(b'"')
+    records_in_db_record = []
+    # TODO Split posts into sub messages
+    # delimeter = b'"\x0bmessagetype'
+    # # Consider only messages with a valid messagetype
+    # if record.value.find(delimeter) != -1:
+    #     # Posts contain multiple messages in one database record that is why it is necessary to split
+    #     if(record.value.find(delimeter) > 1):
+    #
+    #         records_in_db_record = [e+delimeter for e in record.value.split(delimeter) if e]
+    #         print(records_in_db_record)
+    #     else:
+    #         records_in_db_record.append(record.value)
+    records_in_db_record.append(record.value)
+    cleaned_records = []
 
-            for i, field in enumerate(key_values):
-                # check if field is a key - ignore the first byte as it is usually junk
-                # Only add each key only once
-                if field[1::] in message_types[key]['fields'] and field[1::] not in cleaned_record:
-                    # use current field as key, use next field as value
-                    cleaned_record[field[1::]] = strip_html_tags(decode_value(key_values[i + 1][1::]))
-            # Get nested schemas, such as files or hyperlinks, could be both
-            cleaned_record[b'nested_content'] = []
-            for schema in nested_schema:
-                if nested_schema[schema]['identifier'] in record.value:
-                    cleaned_record[b'nested_content'].append(
-                        get_nested_data_structures(record, nested_schema[schema]['identifier']))
+    for r in records_in_db_record:
+        for key in message_types:
+            if r.find(b'"') != -1:
+                t = True
+                cleaned_record = {}
+                key_values = r.split(b'"')
 
-            # Determine the message type by checking if the identifiers match
-            for identifier_key in message_types[key]['identifier']:
-                if identifier_key in cleaned_record:
-                    if cleaned_record[identifier_key] != message_types[key]['identifier'][identifier_key]:
-                        t = False
+                for i, field in enumerate(key_values):
+                    # check if field is a key - ignore the first byte as it is usually junk
+                    # Only add each key only once
+                    if field[1::] in message_types[key]['fields'] and field[1::] not in cleaned_record:
+                        # use current field as key, use next field as value
+                        cleaned_record[field[1::]] = strip_html_tags(decode_value(key_values[i + 1][1::]))
+                # Get nested schemas, such as files or hyperlinks, could be both
+                cleaned_record[b'nested_content'] = []
+                for schema in nested_schema:
+                    if nested_schema[schema]['identifier'] in r:
+                        cleaned_record[b'nested_content'].append(
+                            get_nested_data_structures(r, nested_schema[schema]['identifier']))
 
-            # Lets only consider the entries that are complete and that have a valid content type
-            if t and all(c in cleaned_record for c in message_types[key]['fields']):
-                cleaned_record[b'type'] = key
+                # Determine the message type by checking if the identifiers match
+                for identifier_key in message_types[key]['identifier']:
+                    if identifier_key in cleaned_record:
+                        if cleaned_record[identifier_key] != message_types[key]['identifier'][identifier_key]:
+                            t = False
 
-
-                # Check for emotions such as likes, hearts, grumpy face
-                if b'\x08emotionso' in key_values:
-                    cleaned_record[b'emotion'] = get_emotion(record)
-                else:
-                    cleaned_record[b'emotion'] = None
-
-                # Mark a record as deleted
-                if b'\ndeletetime' in key_values:
-                    cleaned_record[b'deleted'] = get_delete_time(record)
-                else:
-                    cleaned_record[b'deleted'] = None
-
-                if key == 'message':
-                    # Patch the content of messages by specifically looking for divs
-                    cleaned_record[b'content'] = strip_html_tags(get_content(record))
-
-                # Do some further processing for message types that have nested JSONs, but not schemas.
-                if key == 'meeting':
-                    meeting_details = get_meeting(record)
-                    cleaned_record[b'content'] = meeting_details
-                elif key == 'call_log':
-                    call_details = get_call(record)
-                    cleaned_record[b'content'] = call_details
-
-                return cleaned_record
+                # Lets only consider the entries that are complete and that have a valid content type
+                if t and all(c in cleaned_record for c in message_types[key]['fields']):
+                    cleaned_record[b'type'] = key
 
 
-    # No type could be determined
-    return None
+                    # Check for emotions such as likes, hearts, grumpy face
+                    if b'\x08emotionso' in key_values:
+                        cleaned_record[b'emotion'] = get_emotion(r)
+                    else:
+                        cleaned_record[b'emotion'] = None
+
+                    # Mark a record as deleted
+                    if b'\ndeletetime' in key_values:
+                        cleaned_record[b'deleted'] = get_delete_time(r)
+                    else:
+                        cleaned_record[b'deleted'] = None
+
+                    if key == 'message':
+                        # Patch the content of messages by specifically looking for divs
+                        cleaned_record[b'content'] = strip_html_tags(get_content(r))
+
+                    # Do some further processing for message types that have nested JSONs, but not schemas.
+                    if key == 'meeting':
+                        meeting_details = get_meeting(r)
+                        cleaned_record[b'content'] = meeting_details
+                    elif key == 'call_log':
+                        call_details = get_call(r)
+                        cleaned_record[b'content'] = call_details
+
+                    cleaned_records.append(cleaned_record)
 
 
-def parse_records(fetched_ldb_records):
+    return cleaned_records
+
+
+def parse_records(fetched_ldb_records, outputpath):
     # Split up records by message type
     cleaned_records = []
 
     for fetched_record in fetched_ldb_records:
-        record = determine_record_type(fetched_record)
-        if record is not None:
-            # Decode the dict keys
-            cleaned_record = {key.decode(): val for key, val in record.items()}
-            # Include additional information about the database record, such as file origin, and the state
-            cleaned_record["origin_file"] = str(fetched_record.origin_file)
-            cleaned_record["file_type"] = fetched_record.file_type.name
-            cleaned_record["offset"] = fetched_record.offset
-            cleaned_record["seq"] = fetched_record.seq
-            cleaned_record["state"] = fetched_record.state.name
-            cleaned_record["was_compressed"] = fetched_record.was_compressed
-            cleaned_records.append(cleaned_record)
+        records = determine_record_type(fetched_record)
+        if records is not None:
+            for record in records:
+                # Decode the dict keys
+                cleaned_record = {key.decode(): val for key, val in record.items()}
+                # Include additional information about the database record, such as file origin, and the state
+                cleaned_record["origin_file"] = str(fetched_record.origin_file)
+                cleaned_record["file_type"] = fetched_record.file_type.name
+                cleaned_record["offset"] = fetched_record.offset
+                cleaned_record["seq"] = fetched_record.seq
+                cleaned_record["state"] = fetched_record.state.name
+                cleaned_record["was_compressed"] = fetched_record.was_compressed
+                cleaned_records.append(cleaned_record)
 
     # Filter by messages
     messages = [d for d in cleaned_records if d['type'] == 'message']
 
 
     # Remove duplicates based on their deduplication key
-    # messages = [i for n, i in enumerate(cleaned_records) if
-    #             i.get('cachedDeduplicationKey') not in [y.get('cachedDeduplicationKey') for y in cleaned_records[n + 1:]]]
+    messages = [i for n, i in enumerate(cleaned_records) if
+                i.get('cachedDeduplicationKey') not in [y.get('cachedDeduplicationKey') for y in cleaned_records[n + 1:]]]
 
     # Filter by reactions
     # reactions = [d for d in cleaned_records if d['type'] == 'reaction_in_chat']
@@ -276,7 +291,7 @@ def parse_records(fetched_ldb_records):
     # print(replies)
 
     # Write results to JSON to process these in Autopsy
-    write_results_to_json(messages)
+    write_results_to_json(messages, outputpath)
 
 
 def parse_message_reaction(messages):
@@ -305,13 +320,13 @@ def parse_text_message(messages):
         print(f"Compose Time: {m['composetime'][:19]} - User: {m['imdisplayname']} - Message: {m['content']}")
 
 
-def write_results_to_json(data):
+def write_results_to_json(data, outputpath):
     # Dump messages into a json file
-    with open('teams.json', 'w') as f:
+    with open(outputpath, 'w') as f:
         json.dump(data, f)
 
 
-def read_input(filepath):
+def read_input(filepath, outputpath):
     # Do some basic error handling
     if not filepath.endswith('leveldb'):
         raise Exception('Expected a leveldb folder. Path: {}'.format(filepath))
@@ -324,16 +339,19 @@ def read_input(filepath):
         raise Exception('Given file path is not a folder. Path: {}'.format(filepath))
 
     # TODO Possibly copy the artefacts before processing them?
-    parse_db(filepath)
+    parse_db(filepath, outputpath)
 
 
 @click.command()
 @click.option('--filepath', '-f', required=True, default='data/conversation.json',
               help="Relative file path to JSON with conversation data")
-def cli(filepath):
+
+@click.option('--outputpath', '-o', required=False, default='teams.json',
+              help="Relative file path to JSON with conversation data")
+def cli(filepath, outputpath):
     header = pyfiglet.figlet_format("Forensics.im Dump Tool")
     click.echo(header)
-    read_input(filepath)
+    read_input(filepath, outputpath)
 
 
 if __name__ == '__main__':
