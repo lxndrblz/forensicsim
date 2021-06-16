@@ -49,6 +49,8 @@ from org.sleuthkit.datamodel import Account
 from org.sleuthkit.datamodel.blackboardutils import CommunicationArtifactsHelper
 from org.sleuthkit.datamodel.blackboardutils.CommunicationArtifactsHelper import CommunicationDirection
 from org.sleuthkit.datamodel.blackboardutils.CommunicationArtifactsHelper import MessageReadStatus
+from org.sleuthkit.datamodel.blackboardutils.attributes import MessageAttachments
+from org.sleuthkit.datamodel.blackboardutils.attributes.MessageAttachments import URLAttachment
 from org.sleuthkit.autopsy.ingest import IngestModule
 from org.sleuthkit.autopsy.ingest.IngestModule import IngestModuleException
 from org.sleuthkit.autopsy.ingest import DataSourceIngestModule
@@ -187,6 +189,8 @@ class ForensicIMIngestModule(DataSourceIngestModule):
         sleuthkit_case = Case.getCurrentCase().getSleuthkitCase()
         module_name = ForensicIMIngestModuleFactory.moduleName
         # Process per file
+        # TODO Check if it makes sense to change the CommunicationArtifactsHelper to include the self account
+        # http://sleuthkit.org/sleuthkit/docs/jni-docs/4.10.2//classorg_1_1sleuthkit_1_1datamodel_1_1blackboardutils_1_1_communication_artifacts_helper.html#aede562cd1efd64588a052cb0013f42cd
         for file in database_sub_files:
             db_file_path = self.get_level_db_file(content, file['origin_file'])
             helper = CommunicationArtifactsHelper(sleuthkit_case, module_name, db_file_path, Account.Type.MESSAGING_APP)
@@ -217,7 +221,7 @@ class ForensicIMIngestModule(DataSourceIngestModule):
             # TODO Change back an email address
             from_address = message["imdisplayname"]
             to_address = ""
-            subject = ""
+            subject = None
             message_text = message["content"]
             # Timestamp
             dt = datetime.strptime(message['composetime'][:19], "%Y-%m-%dT%H:%M:%S")
@@ -232,9 +236,19 @@ class ForensicIMIngestModule(DataSourceIngestModule):
             artifact = app_db_helper.addMessage(message_type, direction, from_address, to_address, timestamp,
                                                 MessageReadStatus.UNKNOWN, subject, message_text, thread_id)
 
-            # TODO add message attachments URLs and Media Files
+            file_attachments = ArrayList()
+            url_attachments = ArrayList()
 
-
+            if message['nested_content'] is not None:
+                for schema in message['nested_content']:
+                    for nc in schema:
+                        # Attach files like links, but need to get a different property
+                        if nc['@type'] == "http://schema.skype.com/File":
+                            url_attachments.add(URLAttachment(nc['objectUrl']))
+                        if nc['@type'] == "http://schema.skype.com/HyperLink":
+                            url_attachments.add(URLAttachment(nc['url']))
+            message_attachments = MessageAttachments(file_attachments, url_attachments)
+            app_db_helper.addAttachments(artifact, message_attachments)
 
     def process(self, data_source, progress_bar):
 
