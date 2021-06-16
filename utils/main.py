@@ -139,10 +139,21 @@ def get_emotion(record):
 
 def get_delete_time(record):
     utf8_encoded = record.decode('utf-8', 'replace')
-    # grep the meeting json
+    # grep the delete time in milliseconds
     content_utf8_encoded = utf8_encoded.split('"\ndeletetime"')[1]
     content_utf8_encoded = content_utf8_encoded.split('"\nimportanceI')[0]
-    # replace null with null, false and true otherwise it throws an error
+    # Make a nice formatted time out of the timestamp
+    return convert_time_stamps(content_utf8_encoded)
+
+def get_edit_time(record):
+    utf8_encoded = record.decode('utf-8', 'replace')
+    # grep the version timestamp in milliseconds
+    content_utf8_encoded = utf8_encoded.split('"\x07version"')[1]
+    content_utf8_encoded = content_utf8_encoded.split('"\x13messageStorageStateI')[0]
+    # Make a nice formatted time out of the timestamp
+    return convert_time_stamps(content_utf8_encoded)
+
+def convert_time_stamps(content_utf8_encoded):
     # timestamp appear in epoch format with milliseconds alias currentmillis
     # Convert data to neat timestamp
     delete_time_datetime = datetime.utcfromtimestamp(int(content_utf8_encoded)/1000)
@@ -235,6 +246,12 @@ def determine_record_type(record):
                         cleaned_record[b'deleted'] = get_delete_time(r)
                     else:
                         cleaned_record[b'deleted'] = None
+
+                    # Mark a record as edited and get the latest version timestamp
+                    if b'\x07version' in key_values:
+                        cleaned_record[b'edited'] = get_edit_time(r)
+                    else:
+                        cleaned_record[b'edited'] = None
 
                     if key == 'message':
                         # Patch the content of messages by specifically looking for divs
