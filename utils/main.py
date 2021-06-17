@@ -300,11 +300,8 @@ def parse_records(fetched_ldb_records, outputpath):
     # TODO Implement possible fix for deduplicating records that is universal for all records, possibly clientmessageid
     dirty_records = [d for d in cleaned_records if 'cachedDeduplicationKey' not in d]
 
-    for dirty in dirty_records:
-        print(dirty)
-
-    # distinct_records = distinct_records + dirty_records
-    # write_results_to_json(distinct_records, outputpath)
+    distinct_records = distinct_records + dirty_records
+    write_results_to_json(distinct_records, outputpath)
 
 
 
