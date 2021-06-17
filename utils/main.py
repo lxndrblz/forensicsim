@@ -120,7 +120,7 @@ def get_call(record):
     utf8_encoded = record.decode('utf-8', 'replace')
     # grep the meeting json
     content_utf8_encoded = utf8_encoded.split('"\x08call-log"')[1]
-    content_utf8_encoded = content_utf8_encoded.split('"\x0es2spartnername')[0]
+    content_utf8_encoded = content_utf8_encoded.split('"\x0es2spartnername"')[0]
     # replace null with null, false and true otherwise it throws an error
     content_utf8_encoded = replace_literal(content_utf8_encoded)
     # Convert string into a dictionary, skip the first two byte
@@ -176,12 +176,13 @@ def determine_record_type(record):
         'reply': {'identifier': {b'activityType': 'reply', b'contenttype': 'text'},
                   'fields': [b'activityType', b'messagetype', b'contenttype', b'messagePreview',
                              b'activityTimestamp', b'composetime', b'originalarrivaltime', b'sourceUserImDisplayName']},
+        'call': {'identifier': {b'messagetype': 'RichText/Html', b'contenttype': 'text'},
+                 'fields': [b'messagetype', b'originalarrivaltime', b'clientArrivalTime', b'clientmessageid', b'composetime', b'originalarrivaltime', b'clientArrivalTime', b'call-log']},
         'message': {'identifier': {b'messageKind': 'skypeMessageLocal', b'contenttype': 'text'},
                     'fields': [b'conversationId', b'messagetype', b'contenttype', b'imdisplayname',
                                b'clientmessageid', b'composetime', b'originalarrivaltime',
-                               b'clientArrivalTime', b'cachedDeduplicationKey']},
-        'call_log': {'identifier': {b'messagetype': 'RichText/Html', b'contenttype': 'text'},
-                 'fields': [b'messagetype', b'originalarrivaltime', b'clientArrivalTime', b'clientmessageid', b'composetime', b'originalarrivaltime', b'clientArrivalTime', b'call-log']}
+                               b'clientArrivalTime', b'cachedDeduplicationKey']}
+
     }
     # Lets identify nested schemas based the the schema type
     nested_schema = {
@@ -261,10 +262,9 @@ def determine_record_type(record):
                     if key == 'meeting':
                         meeting_details = get_meeting(r)
                         cleaned_record[b'content'] = meeting_details
-                    elif key == 'call_log':
+                    elif key == 'call':
                         call_details = get_call(r)
-                        cleaned_record[b'content'] = call_details
-
+                        cleaned_record[b'call-log'] = call_details
                     cleaned_records.append(cleaned_record)
 
 
@@ -290,25 +290,22 @@ def parse_records(fetched_ldb_records, outputpath):
                 cleaned_record["was_compressed"] = fetched_record.was_compressed
                 cleaned_records.append(cleaned_record)
 
-    # Filter by messages
-    messages = [d for d in cleaned_records if d['type'] == 'message']
 
 
-    # Remove duplicates based on their deduplication key
-    messages = [i for n, i in enumerate(cleaned_records) if
+    # Remove duplicates based on their deduplication key at least for the entries that have a cacheDeduplicationKey
+    distinct_records = [i for n, i in enumerate(cleaned_records) if
                 i.get('cachedDeduplicationKey') not in [y.get('cachedDeduplicationKey') for y in cleaned_records[n + 1:]]]
 
-    # Filter by reactions
-    # reactions = [d for d in cleaned_records if d['type'] == 'reaction_in_chat']
-    # parse_message_reaction(reactions)
-    #
+    # Add the entries without a cachedDeduplicationKey
+    # TODO Implement possible fix for deduplicating records that is universal for all records, possibly clientmessageid
+    dirty_records = [d for d in cleaned_records if 'cachedDeduplicationKey' not in d]
 
-    # Filter for deleted messages
-    # replies = [d for d in cleaned_records if d['type'] == 'message_deleted']
-    # print(replies)
+    for dirty in dirty_records:
+        print(dirty)
 
-    # Write results to JSON to process these in Autopsy
-    write_results_to_json(messages, outputpath)
+    # distinct_records = distinct_records + dirty_records
+    # write_results_to_json(distinct_records, outputpath)
+
 
 
 def parse_message_reaction(messages):

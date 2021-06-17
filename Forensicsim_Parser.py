@@ -49,6 +49,7 @@ from org.sleuthkit.datamodel import Account
 from org.sleuthkit.datamodel.blackboardutils import CommunicationArtifactsHelper
 from org.sleuthkit.datamodel.blackboardutils.CommunicationArtifactsHelper import CommunicationDirection
 from org.sleuthkit.datamodel.blackboardutils.CommunicationArtifactsHelper import MessageReadStatus
+from org.sleuthkit.datamodel.blackboardutils.CommunicationArtifactsHelper import CallMediaType
 from org.sleuthkit.datamodel.blackboardutils.attributes import MessageAttachments
 from org.sleuthkit.datamodel.blackboardutils.attributes.MessageAttachments import URLAttachment
 from org.sleuthkit.autopsy.ingest import IngestModule
@@ -199,6 +200,11 @@ class ForensicIMIngestModule(DataSourceIngestModule):
             # get the messages
             messages = [d for d in file_entries if d['type'] == 'message']
             self.parse_messages(helper, messages)
+
+            # get the calls
+            calls = [d for d in file_entries if d['type'] == 'call']
+            self.parse_calls(helper, calls)
+
     def get_level_db_file(self, content, filepath):
         # Get the file name
         filename = str(filepath).split('\\')[-1:][0]
@@ -212,6 +218,30 @@ class ForensicIMIngestModule(DataSourceIngestModule):
         db_file = results.get(0)  # Expect a single match so retrieve the first (and only) file
         return db_file
 
+    def date_to_long(self, formatted_date):
+        # Timestamp
+        dt = datetime.strptime(formatted_date[:19], "%Y-%m-%dT%H:%M:%S")
+        time_struct = dt.timetuple()
+        timestamp = int(calendar.timegm(time_struct))
+        return timestamp
+
+    def parse_calls(self, app_db_helper, calls):
+        for call in calls:
+            from_address = call['call-log']['originator']
+            to_address = call['call-log']['target']
+            start_date = self.date_to_long(call['call-log']['startTime'])
+            end_date = self.date_to_long(call['call-log']['endTime'])
+            call_direction = CommunicationDirection.UNKNOWN
+
+            if call['call-log']['callDirection'] == 'incoming':
+                call_direction = CommunicationDirection.INCOMING
+            elif call['call-log']['callDirection'] == 'outgoing':
+                call_direction = CommunicationDirection.OUTGOING
+
+            # TODO implement call state, such as missed/accepted
+            artifact = app_db_helper.addCalllog(call_direction, from_address, to_address, start_date, end_date, CallMediaType.UNKNOWN)
+
+
 
     def parse_messages(self, app_db_helper, messages):
         # We will use the integrated add message function to add a TSK_MESSAGE
@@ -223,10 +253,8 @@ class ForensicIMIngestModule(DataSourceIngestModule):
             to_address = ""
             subject = None
             message_text = message["content"]
-            # Timestamp
-            dt = datetime.strptime(message['composetime'][:19], "%Y-%m-%dT%H:%M:%S")
-            time_struct = dt.timetuple()
-            timestamp = int(calendar.timegm(time_struct))
+            timestamp = self.date_to_long(message['composetime'])
+
             # Group by the conversationId, these can be direct messages, but also posts
             thread_id = message["conversationId"]
             # TODO Fix direction, possibly determine direction based on account name?
