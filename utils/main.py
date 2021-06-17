@@ -116,6 +116,7 @@ def get_meeting(record):
     # Convert string into a dictionary, skip the first two byte
     return ast.literal_eval(content_utf8_encoded[2::])
 
+
 def get_call(record):
     utf8_encoded = record.decode('utf-8', 'replace')
     # grep the meeting json
@@ -137,6 +138,7 @@ def get_emotion(record):
     # Convert string into a dictionary, skip the first two byte
     return content_utf8_encoded[1::]
 
+
 def get_delete_time(record):
     utf8_encoded = record.decode('utf-8', 'replace')
     # grep the delete time in milliseconds
@@ -144,6 +146,7 @@ def get_delete_time(record):
     content_utf8_encoded = content_utf8_encoded.split('"\nimportanceI')[0]
     # Make a nice formatted time out of the timestamp
     return convert_time_stamps(content_utf8_encoded)
+
 
 def get_edit_time(record):
     utf8_encoded = record.decode('utf-8', 'replace')
@@ -153,13 +156,15 @@ def get_edit_time(record):
     # Make a nice formatted time out of the timestamp
     return convert_time_stamps(content_utf8_encoded)
 
+
 def convert_time_stamps(content_utf8_encoded):
     # timestamp appear in epoch format with milliseconds alias currentmillis
     # Convert data to neat timestamp
-    delete_time_datetime = datetime.utcfromtimestamp(int(content_utf8_encoded)/1000)
+    delete_time_datetime = datetime.utcfromtimestamp(int(content_utf8_encoded) / 1000)
     delete_time_string = delete_time_datetime.strftime('%Y-%m-%dT%H:%M:%S.%f')
 
     return str(delete_time_string)
+
 
 def determine_record_type(record):
     message_types = {
@@ -168,16 +173,18 @@ def determine_record_type(record):
                                b'clientArrivalTime', b'cachedDeduplicationKey']},
         'reaction_in_chat': {'identifier': {b'activityType': 'reactionInChat', b'contenttype': 'text'},
                              'fields': [b'activityType', b'messagetype', b'contenttype', b'activitySubtype',
-                                        b'originalarrivaltime',
+                                        b'originalarrivaltime', b'clientmessageid',
                                         b'activityTimestamp', b'composetime', b'sourceUserImDisplayName']},
         'reaction': {'identifier': {b'activityType': 'reaction', b'contenttype': 'text'},
                      'fields': [b'activityType', b'messagetype', b'contenttype', b'originalarrivaltime',
+                                b'clientmessageid'
                                 b'activityTimestamp', b'composetime', b'sourceUserImDisplayName', b'activitySubtype']},
         'reply': {'identifier': {b'activityType': 'reply', b'contenttype': 'text'},
-                  'fields': [b'activityType', b'messagetype', b'contenttype', b'messagePreview',
+                  'fields': [b'activityType', b'messagetype', b'contenttype', b'messagePreview', b'clientmessageid',
                              b'activityTimestamp', b'composetime', b'originalarrivaltime', b'sourceUserImDisplayName']},
         'call': {'identifier': {b'messagetype': 'RichText/Html', b'contenttype': 'text'},
-                 'fields': [b'messagetype', b'originalarrivaltime', b'clientArrivalTime', b'clientmessageid', b'composetime', b'originalarrivaltime', b'clientArrivalTime', b'call-log']},
+                 'fields': [b'messagetype', b'originalarrivaltime', b'clientArrivalTime', b'clientmessageid',
+                            b'composetime', b'originalarrivaltime', b'clientArrivalTime', b'call-log']},
         'message': {'identifier': {b'messageKind': 'skypeMessageLocal', b'contenttype': 'text'},
                     'fields': [b'conversationId', b'messagetype', b'contenttype', b'imdisplayname',
                                b'clientmessageid', b'composetime', b'originalarrivaltime',
@@ -235,7 +242,6 @@ def determine_record_type(record):
                 if t and all(c in cleaned_record for c in message_types[key]['fields']):
                     cleaned_record[b'type'] = key
 
-
                     # Check for emotions such as likes, hearts, grumpy face
                     if b'\x08emotionso' in key_values:
                         cleaned_record[b'emotion'] = get_emotion(r)
@@ -267,13 +273,12 @@ def determine_record_type(record):
                         cleaned_record[b'call-log'] = call_details
                     cleaned_records.append(cleaned_record)
 
-
     return cleaned_records
 
 
 def parse_records(fetched_ldb_records, outputpath):
     # Split up records by message type
-    cleaned_records = []
+    parsed_records = []
 
     for fetched_record in fetched_ldb_records:
         records = determine_record_type(fetched_record)
@@ -288,21 +293,20 @@ def parse_records(fetched_ldb_records, outputpath):
                 cleaned_record["seq"] = fetched_record.seq
                 cleaned_record["state"] = fetched_record.state.name
                 cleaned_record["was_compressed"] = fetched_record.was_compressed
-                cleaned_records.append(cleaned_record)
-
-
+                parsed_records.append(cleaned_record)
 
     # Remove duplicates based on their deduplication key at least for the entries that have a cacheDeduplicationKey
-    distinct_records = [i for n, i in enumerate(cleaned_records) if
-                i.get('cachedDeduplicationKey') not in [y.get('cachedDeduplicationKey') for y in cleaned_records[n + 1:]]]
+    distinct_records = [i for n, i in enumerate(parsed_records) if
+                        i.get('cachedDeduplicationKey') not in [y.get('cachedDeduplicationKey') for y in
+                                                                parsed_records[n + 1:]]]
 
-    # Add the entries without a cachedDeduplicationKey
-    # TODO Implement possible fix for deduplicating records that is universal for all records, possibly clientmessageid
-    dirty_records = [d for d in cleaned_records if 'cachedDeduplicationKey' not in d]
+    # Add the entries without a cachedDeduplicationKey, these are filtered based on the clientmessageid
+    dirty_records = [d for d in parsed_records if 'cachedDeduplicationKey' not in d]
+    clean_records = [i for n, i in enumerate(dirty_records) if
+                     i.get('clientmessageid') not in [y.get('clientmessageid') for y in dirty_records[n + 1:]]]
 
-    distinct_records = distinct_records + dirty_records
+    distinct_records = distinct_records + clean_records
     write_results_to_json(distinct_records, outputpath)
-
 
 
 def parse_message_reaction(messages):
@@ -356,7 +360,6 @@ def read_input(filepath, outputpath):
 @click.command()
 @click.option('--filepath', '-f', required=True, default='data/conversation.json',
               help="Relative file path to JSON with conversation data")
-
 @click.option('--outputpath', '-o', required=False, default='teams.json',
               help="Relative file path to JSON with conversation data")
 def cli(filepath, outputpath):
