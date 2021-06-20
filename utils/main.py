@@ -173,23 +173,25 @@ def determine_record_type(record):
                                b'clientArrivalTime', b'cachedDeduplicationKey']},
         'reaction_in_chat': {'identifier': {b'activityType': 'reactionInChat', b'contenttype': 'text'},
                              'fields': [b'activityType', b'messagetype', b'contenttype', b'activitySubtype',
-                                        b'originalarrivaltime', b'clientmessageid',
+                                        b'originalarrivaltime', b'clientmessageid', b'creator',
                                         b'activityTimestamp', b'composetime', b'sourceUserImDisplayName']},
         'reaction': {'identifier': {b'activityType': 'reaction', b'contenttype': 'text'},
                      'fields': [b'activityType', b'messagetype', b'contenttype', b'originalarrivaltime',
-                                b'clientmessageid'
+                                b'clientmessageid', b'creator',
                                 b'activityTimestamp', b'composetime', b'sourceUserImDisplayName', b'activitySubtype']},
         'reply': {'identifier': {b'activityType': 'reply', b'contenttype': 'text'},
                   'fields': [b'activityType', b'messagetype', b'contenttype', b'messagePreview', b'clientmessageid',
-                             b'activityTimestamp', b'composetime', b'originalarrivaltime', b'sourceUserImDisplayName']},
+                             b'activityTimestamp', b'composetime', b'originalarrivaltime', b'sourceUserImDisplayName',
+                             b'creator']},
         'call': {'identifier': {b'messagetype': 'RichText/Html', b'contenttype': 'text'},
                  'fields': [b'messagetype', b'originalarrivaltime', b'clientArrivalTime', b'clientmessageid',
                             b'composetime', b'originalarrivaltime', b'clientArrivalTime', b'call-log']},
         'message': {'identifier': {b'messageKind': 'skypeMessageLocal', b'contenttype': 'text'},
                     'fields': [b'conversationId', b'messagetype', b'contenttype', b'imdisplayname',
-                               b'clientmessageid', b'composetime', b'originalarrivaltime',
-                               b'clientArrivalTime', b'cachedDeduplicationKey']}
-
+                               b'clientmessageid', b'composetime', b'originalarrivaltime', b'creator',
+                               b'clientArrivalTime', b'cachedDeduplicationKey']},
+        'contact': {'identifier': {b'userType': 'Member'},
+                    'fields': [b'displayName', b'mri', b'email', b'userPrincipalName']}
     }
     # Lets identify nested schemas based the the schema type
     nested_schema = {
@@ -241,26 +243,26 @@ def determine_record_type(record):
                 # Lets only consider the entries that are complete and that have a valid content type
                 if t and all(c in cleaned_record for c in message_types[key]['fields']):
                     cleaned_record[b'type'] = key
-
-                    # Check for emotions such as likes, hearts, grumpy face
-                    if b'\x08emotionso' in key_values:
-                        cleaned_record[b'emotion'] = get_emotion(r)
-                    else:
-                        cleaned_record[b'emotion'] = None
-
-                    # Mark a record as deleted
-                    if b'\ndeletetime' in key_values:
-                        cleaned_record[b'deleted'] = get_delete_time(r)
-                    else:
-                        cleaned_record[b'deleted'] = None
-
-                    # Mark a record as edited and get the latest version timestamp
-                    if b'\x07version' in key_values:
-                        cleaned_record[b'edited'] = get_edit_time(r)
-                    else:
-                        cleaned_record[b'edited'] = None
-
+                    # Check for some additional operations, if the type is a message
                     if key == 'message':
+                        # Check for emotions such as likes, hearts, grumpy face
+                        if b'\x08emotionso' in key_values:
+                            cleaned_record[b'emotion'] = get_emotion(r)
+                        else:
+                            cleaned_record[b'emotion'] = None
+
+                        # Mark a record as deleted
+                        if b'\ndeletetime' in key_values:
+                            cleaned_record[b'deleted'] = get_delete_time(r)
+                        else:
+                            cleaned_record[b'deleted'] = None
+
+                        # Mark a record as edited and get the latest version timestamp
+                        if b'\x07version' in key_values:
+                            cleaned_record[b'edited'] = get_edit_time(r)
+                        else:
+                            cleaned_record[b'edited'] = None
+
                         # Patch the content of messages by specifically looking for divs
                         cleaned_record[b'content'] = strip_html_tags(get_content(r))
 
@@ -296,18 +298,21 @@ def parse_records(fetched_ldb_records, outputpath):
                 parsed_records.append(cleaned_record)
 
     # Remove duplicates based on their deduplication key at least for the entries that have a cacheDeduplicationKey
-    distinct_records = [i for n, i in enumerate(parsed_records) if
-                        i.get('cachedDeduplicationKey') not in [y.get('cachedDeduplicationKey') for y in
-                                                                parsed_records[n + 1:]]]
+    # distinct_records = [i for n, i in enumerate(parsed_records) if
+    #                     i.get('cachedDeduplicationKey') not in [y.get('cachedDeduplicationKey') for y in
+    #                                                             parsed_records[n + 1:]]]
+    #
+    # # Add the entries without a cachedDeduplicationKey, these are filtered based on the clientmessageid
+    # dirty_records = [d for d in parsed_records if 'cachedDeduplicationKey' not in d]
+    # clean_records = [i for n, i in enumerate(dirty_records) if
+    #                  i.get('clientmessageid') not in [y.get('clientmessageid') for y in dirty_records[n + 1:]]]
+    #
+    # distinct_records = distinct_records + clean_records
+    # write_results_to_json(distinct_records, outputpath)
 
-    # Add the entries without a cachedDeduplicationKey, these are filtered based on the clientmessageid
-    dirty_records = [d for d in parsed_records if 'cachedDeduplicationKey' not in d]
-    clean_records = [i for n, i in enumerate(dirty_records) if
-                     i.get('clientmessageid') not in [y.get('clientmessageid') for y in dirty_records[n + 1:]]]
+    # TODO enable deduplication again
 
-    distinct_records = distinct_records + clean_records
-    write_results_to_json(distinct_records, outputpath)
-
+    write_results_to_json(parsed_records, outputpath)
 
 def parse_message_reaction(messages):
     messages.sort(key=lambda date: datetime.strptime(date['composetime'][:19], "%Y-%m-%dT%H:%M:%S"))

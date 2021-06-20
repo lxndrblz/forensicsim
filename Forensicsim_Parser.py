@@ -67,6 +67,10 @@ from org.sleuthkit.autopsy.casemodule import Case
 from org.sleuthkit.datamodel import CommunicationsManager
 from org.sleuthkit.datamodel import BlackboardArtifact
 from org.sleuthkit.datamodel import BlackboardAttribute
+from org.sleuthkit.datamodel import BlackboardAttribute
+from org.sleuthkit.datamodel import TskCoreException
+from org.sleuthkit.datamodel.Blackboard import BlackboardException
+from org.sleuthkit.autopsy.casemodule import NoCurrentCaseException
 
 # Common Prefix Shared for all artefacts
 ARTIFACT_PREFIX = "Microsoft Teams "
@@ -217,6 +221,10 @@ class ForensicIMIngestModule(DataSourceIngestModule):
             # Get only the records per file
             file_entries = [d for d in imported_records if d['origin_file'] == file['origin_file']]
 
+            # get the contacts first, all other message types can be linked based on the mri
+            contacts = [d for d in file_entries if d['type'] == 'contact']
+            self.parse_contacts(helper, contacts)
+
             # get the messages
             messages = [d for d in file_entries if d['type'] == 'message']
             self.parse_messages(helper, messages)
@@ -296,7 +304,27 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                 call_direction = CommunicationDirection.OUTGOING
 
             # TODO implement call state, such as missed/accepted
-            artifact = app_db_helper.addCalllog(call_direction, from_address, to_address, start_date, end_date, CallMediaType.UNKNOWN)
+            app_db_helper.addCalllog(call_direction, from_address, to_address, start_date, end_date, CallMediaType.UNKNOWN)
+
+    def parse_contacts(self, app_db_helper, contacts):
+
+        try:
+            for contact in contacts:
+                contact_account_id = contact['mri']
+                contact_name = contact['displayName']
+                contact_phone_number = None
+                contact_home_phone_number = None
+                contact_mobile_phone_number = None
+                contact_email = contact['email']
+                additionalAttributes = ArrayList()
+                additionalAttributes.add(BlackboardAttribute(BlackboardAttribute.ATTRIBUTE_TYPE.TSK_ID, "Microsoft Teams", contact['mri']))
+                app_db_helper.addContact(contact_name, contact_phone_number, contact_home_phone_number, contact_mobile_phone_number, contact_email, additionalAttributes)
+        except TskCoreException as e:
+            self._logger.log(Level.SEVERE,
+                             "Error adding Microsoft Teams contact artifacts to the case database.", e)
+        except BlackboardException as e:
+            self._logger.log(Level.WARNING,
+                             "Error posting contact artifact to the blackboard.", e)
 
     def create_artifact_type(self, artifact_name, artifact_description, blackboard):
         try:
