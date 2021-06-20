@@ -207,11 +207,11 @@ class ForensicIMIngestModule(DataSourceIngestModule):
 
         sleuthkit_case = Case.getCurrentCase().getSleuthkitCase()
         module_name = ForensicIMIngestModuleFactory.moduleName
-        # Process per file
-        # TODO Check if it makes sense to change the CommunicationArtifactsHelper to include the self account
+        # Process all entries per file
         # http://sleuthkit.org/sleuthkit/docs/jni-docs/4.10.2//classorg_1_1sleuthkit_1_1datamodel_1_1blackboardutils_1_1_communication_artifacts_helper.html#aede562cd1efd64588a052cb0013f42cd
-        progress_bar.switchToDeterminate("Analyzing Records", 0, len(database_sub_files))
-        for i, file in enumerate(database_sub_files):
+        progress_bar.switchToDeterminate(len(imported_records))
+        self.progress = 0
+        for file in database_sub_files:
             db_file_path = self.get_level_db_file(content, file['origin_file'])
             helper = CommunicationArtifactsHelper(sleuthkit_case, module_name, db_file_path, Account.Type.MESSAGING_APP)
             # Get only the records per file
@@ -221,14 +221,27 @@ class ForensicIMIngestModule(DataSourceIngestModule):
             messages = [d for d in file_entries if d['type'] == 'message']
             self.parse_messages(helper, messages)
 
+            # Update progressbar for every processed file, might not be linear
+            self.update_progress(progress_bar, len(messages))
+
             # get the calls
             calls = [d for d in file_entries if d['type'] == 'call']
             self.parse_calls(helper, calls)
 
+            # Update progressbar for every processed file, might not be linear
+            self.update_progress(progress_bar, len(calls))
+
             # get the meetings
             meetings = [d for d in file_entries if d['type'] == 'meeting']
             self.parse_meetings(db_file_path, meetings)
-            progress_bar.progress(i)
+
+            # Update progressbar for every processed file, might not be linear
+            self.update_progress(progress_bar, len(meetings))
+
+
+    def update_progress(self, progress_bar, items_processed):
+        self.progress += items_processed
+        progress_bar.progress(self.progress)
 
     def get_level_db_file(self, content, filepath):
         # Get the file name
@@ -287,17 +300,17 @@ class ForensicIMIngestModule(DataSourceIngestModule):
 
     def create_artifact_type(self, artifact_name, artifact_description, blackboard):
         try:
-            art = blackboard.getOrAddArtifactType(artifact_name, ARTIFACT_PREFIX + artifact_description)
+            artifact = blackboard.getOrAddArtifactType(artifact_name, ARTIFACT_PREFIX + artifact_description)
         except Exception as e :
             self.log(Level.INFO, "Error getting or adding artifact type: {} {}".format(artifact_description, str(e)))
-        return art
+        return artifact
 
     def create_attribute_type(self, attribute_name, type_name, attribute_description, blackboard):
         try:
-            att_type = blackboard.getOrAddAttributeType(attribute_name, type_name, attribute_description)
+            attribute = blackboard.getOrAddAttributeType(attribute_name, type_name, attribute_description)
         except Exception as e:
             self.log(Level.INFO, "Error getting or adding attribute type: {} {}".format(attribute_description, str(e)))
-        return att_type
+        return attribute
 
     def parse_messages(self, app_db_helper, messages):
         # We will use the integrated add message function to add a TSK_MESSAGE
@@ -355,7 +368,6 @@ class ForensicIMIngestModule(DataSourceIngestModule):
         directories_to_process = len(all_ms_teams_leveldbs)
 
         self.log(Level.INFO, "Found {} Microsoft Teams directories to process.".format(directories_to_process))
-        progress_bar.switchToDeterminate(directories_to_process)
 
         for i, content in enumerate(all_ms_teams_leveldbs):
             # Check if the user pressed cancel while we are processing the files
@@ -365,8 +377,7 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                                                       "Analysis of LevelDB has been aborted.")
                 IngestServices.getInstance().postMessage(message)
                 return IngestModule.ProcessResult.OK
-            # Update progress both to the progress bar and by loggging
-            progress_bar.progress(i)
+            # Update progress both to the progress bar and log which file is currently processed
             self.log(Level.INFO, "Processing item {} of {}: {}".format(i, directories_to_process, content.getName()))
             # Ignore false positives
             if not content.isDir():
