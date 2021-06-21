@@ -1,5 +1,5 @@
 """
-Copyright 2020, CCL Forensics
+Copyright 2020-2021, CCL Forensics
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
@@ -30,8 +30,7 @@ import dataclasses
 import enum
 from collections import namedtuple
 from types import MappingProxyType
-
-from ccl_chrome_indexeddb import ccl_simplesnappy
+from . import ccl_simplesnappy
 
 __version__ = "0.4"
 __description__ = "A module for reading LevelDB databases"
