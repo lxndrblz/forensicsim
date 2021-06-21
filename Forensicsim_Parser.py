@@ -217,7 +217,7 @@ class ForensicIMIngestModule(DataSourceIngestModule):
         self.progress = 0
         for file in database_sub_files:
             db_file_path = self.get_level_db_file(content, file['origin_file'])
-            helper = CommunicationArtifactsHelper(sleuthkit_case, module_name, db_file_path, Account.Type.MESSAGING_APP)
+            helper = CommunicationArtifactsHelper(sleuthkit_case, module_name, db_file_path, self.account)
             # Get only the records per file
             file_entries = [d for d in imported_records if d['origin_file'] == file['origin_file']]
 
@@ -274,7 +274,7 @@ class ForensicIMIngestModule(DataSourceIngestModule):
     def parse_meetings(self, db_file_path, meetings):
         blackboard = Case.getCurrentCase().getServices().getBlackboard()
         # Create custom artefacts, because meetings do not exist in Autopsy
-        self.art_meeting = self.create_artifact_type("MST_MEETING", "Meeting", blackboard)
+        self.art_meeting = self.create_artifact_type("MST_MEETING", "Meetings", blackboard)
         art = db_file_path.newArtifact(self.art_meeting.getTypeID())
         for meeting in meetings:
             # Add the subject as a test attribute to the artefact
@@ -310,14 +310,14 @@ class ForensicIMIngestModule(DataSourceIngestModule):
 
         try:
             for contact in contacts:
-                contact_account_id = contact['mri']
+                # contact_account_id = contact['mri']
                 contact_name = contact['displayName']
-                contact_phone_number = None
+                contact_phone_number = contact['mri']
                 contact_home_phone_number = None
                 contact_mobile_phone_number = None
                 contact_email = contact['email']
                 additionalAttributes = ArrayList()
-                additionalAttributes.add(BlackboardAttribute(BlackboardAttribute.ATTRIBUTE_TYPE.TSK_ID, "Microsoft Teams", contact['mri']))
+                # additionalAttributes.add(BlackboardAttribute(BlackboardAttribute.ATTRIBUTE_TYPE.TSK_ID, "Microsoft Teams", contact['mri']))
                 app_db_helper.addContact(contact_name, contact_phone_number, contact_home_phone_number, contact_mobile_phone_number, contact_email, additionalAttributes)
         except TskCoreException as e:
             self._logger.log(Level.SEVERE,
@@ -344,7 +344,7 @@ class ForensicIMIngestModule(DataSourceIngestModule):
         # We will use the integrated add message function to add a TSK_MESSAGE
         # http://sleuthkit.org/autopsy/docs/api-docs/4.12.0//classorg_1_1sleuthkit_1_1autopsy_1_1coreutils_1_1_app_d_b_parser_helper.html#a630bb70bee171df941e363693a1795f3
         for message in messages:
-            message_type = "Microsoft Teams (Direct Message)"
+            message_type = "Microsoft Teams"
             # TODO Change back an email address
             from_address = message["creator"]
 
@@ -360,9 +360,12 @@ class ForensicIMIngestModule(DataSourceIngestModule):
 
             # TODO Additional attributes
 
+            additional_attributes = ArrayList()
+            #additional_attributes.add(BlackboardAttribute(BlackboardAttribute.ATTRIBUTE_TYPE.TSK_DATETIME_MODIFIED, "Microsoft Teams", self.date_to_long(message['edited'])))
+            #additional_attributes.add(BlackboardAttribute(BlackboardAttribute.ATTRIBUTE_TYPE.TSK_TEXT, "Microsoft Teams", message['emotion']))
             # Create the actual artefact in blackboard
             artifact = app_db_helper.addMessage(message_type, direction, from_address, to_address, timestamp,
-                                                MessageReadStatus.UNKNOWN, subject, message_text, thread_id)
+                                                MessageReadStatus.UNKNOWN, subject, message_text, thread_id, additional_attributes)
 
             file_attachments = ArrayList()
             url_attachments = ArrayList()
