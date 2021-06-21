@@ -54,6 +54,7 @@ def send_text_message(message):
         # use pywinauto to send non ASCII characters as well
         keyboard.send_keys(message, with_spaces=True)
         keyboard.send_keys('{ENTER}')
+        logging.info(message)
     except Exception as e:
         print(e)
 
