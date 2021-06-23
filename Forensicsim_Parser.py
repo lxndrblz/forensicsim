@@ -317,6 +317,7 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                 message_type = ARTIFACT_PREFIX
                 direction = self.deduce_message_direction(message["isFromMe"])
                 phone_number_from = message["creator"]
+                # TODO Fix To Number
                 phone_number_to = ""
                 message_date_time = self.date_to_long(message['composetime'])
                 message_read_status = MessageReadStatus.UNKNOWN
@@ -324,11 +325,26 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                 message_text = message["content"]
                 # Group by the conversationId, these can be direct messages, but also posts
                 thread_id = message["conversationId"]
-                # TODO Implement additional attributes
+                # Additional Attributes
+                message_date_time_edited = 0
+                message_date_time_deleted = 0
+
+                if message['edited'] is not None:
+                    message_date_time_edited = self.date_to_long(message['edited'])
+                if message['deleted'] is not None:
+                    message_date_time_deleted = self.date_to_long(message['deleted'])
+                additional_attributes = ArrayList()
+                additional_attributes.add(
+                    BlackboardAttribute(BlackboardAttribute.ATTRIBUTE_TYPE.TSK_DATETIME_MODIFIED, ARTIFACT_PREFIX,
+                                        message_date_time_edited))
+                additional_attributes.add(
+                    BlackboardAttribute(BlackboardAttribute.ATTRIBUTE_TYPE.TSK_DATETIME_DELETED, ARTIFACT_PREFIX,
+                                        message_date_time_deleted))
 
                 artifact = helper.addMessage(message_type, direction, phone_number_from, phone_number_to,
                                              message_date_time,
-                                             message_read_status, subject, message_text, thread_id)
+                                             message_read_status, subject, message_text, thread_id,
+                                             additional_attributes)
 
                 file_attachments = ArrayList()
                 url_attachments = ArrayList()
@@ -397,7 +413,7 @@ class ForensicIMIngestModule(DataSourceIngestModule):
     def index_artifact(self, artifact):
         # Index the artifact for keyword search
         try:
-            blackboard = Case.getCurrentCase().getServices().getBlackbaord()
+            blackboard = Case.getCurrentCase().getServices().getBlackboard()
             blackboard.indexArtifact(artifact)
         except BlackboardException as ex:
             self._logger.log(Level.SEVERE, "Failed to index artifact.", ex)
