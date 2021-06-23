@@ -315,8 +315,7 @@ class ForensicIMIngestModule(DataSourceIngestModule):
         try:
             for message in messages:
                 message_type = ARTIFACT_PREFIX
-                # TODO Fix direction, possibly determine direction based on account name?
-                direction = CommunicationDirection.UNKNOWN
+                direction = self.deduce_message_direction(message["isFromMe"])
                 phone_number_from = message["creator"]
                 phone_number_to = ""
                 message_date_time = self.date_to_long(message['composetime'])
@@ -439,8 +438,14 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                 call_direction = CommunicationDirection.INCOMING
             elif direction == 'outgoing':
                 call_direction = CommunicationDirection.OUTGOING
-            return call_direction
-    
+        return call_direction
+
+    def deduce_message_direction(self, is_from_me):
+        call_direction = CommunicationDirection.INCOMING
+        if is_from_me is True:
+            call_direction = CommunicationDirection.OUTGOING
+        return call_direction
+
     def create_artifact_type(self, artifact_name, artifact_description, blackboard):
         try:
             artifact = blackboard.getOrAddArtifactType(artifact_name, ARTIFACT_PREFIX + artifact_description)
