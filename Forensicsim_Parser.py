@@ -32,48 +32,44 @@
 #   Version 1.0 - Initial version - May 2021
 # 
 
-import csv
+import calendar
 import inspect
 import json
 import os
-import calendar
 from datetime import datetime
-
-from subprocess import Popen, PIPE
 
 from java.io import File
 from java.lang import ProcessBuilder
 from java.util import ArrayList
 from java.util.logging import Level
-from org.sleuthkit.datamodel import Account
-from org.sleuthkit.datamodel.blackboardutils import CommunicationArtifactsHelper
-from org.sleuthkit.datamodel.blackboardutils.CommunicationArtifactsHelper import CommunicationDirection
-from org.sleuthkit.datamodel.blackboardutils.CommunicationArtifactsHelper import MessageReadStatus
-from org.sleuthkit.datamodel.blackboardutils.CommunicationArtifactsHelper import CallMediaType
-from org.sleuthkit.datamodel.blackboardutils.attributes import MessageAttachments
-from org.sleuthkit.datamodel.blackboardutils.attributes.MessageAttachments import URLAttachment
-from org.sleuthkit.autopsy.ingest import IngestModule
-from org.sleuthkit.autopsy.ingest.IngestModule import IngestModuleException
+from org.sleuthkit.autopsy.casemodule import Case
+from org.sleuthkit.autopsy.casemodule import NoCurrentCaseException
+from org.sleuthkit.autopsy.coreutils import ExecUtil
+from org.sleuthkit.autopsy.coreutils import Logger
+from org.sleuthkit.autopsy.coreutils import PlatformUtil
+from org.sleuthkit.autopsy.datamodel import ContentUtils
 from org.sleuthkit.autopsy.ingest import DataSourceIngestModule
 from org.sleuthkit.autopsy.ingest import DataSourceIngestModuleProcessTerminator
-from org.sleuthkit.autopsy.ingest import IngestModuleFactoryAdapter
 from org.sleuthkit.autopsy.ingest import IngestMessage
+from org.sleuthkit.autopsy.ingest import IngestModule
+from org.sleuthkit.autopsy.ingest import IngestModuleFactoryAdapter
 from org.sleuthkit.autopsy.ingest import IngestServices
-from org.sleuthkit.autopsy.coreutils import PlatformUtil
-from org.sleuthkit.autopsy.coreutils import Logger
-from org.sleuthkit.autopsy.coreutils import ExecUtil
-from org.sleuthkit.autopsy.datamodel import ContentUtils
-from org.sleuthkit.autopsy.casemodule import Case
-from org.sleuthkit.datamodel import CommunicationsManager
+from org.sleuthkit.autopsy.ingest.IngestModule import IngestModuleException
 from org.sleuthkit.datamodel import BlackboardArtifact
 from org.sleuthkit.datamodel import BlackboardAttribute
-from org.sleuthkit.datamodel import BlackboardAttribute
+from org.sleuthkit.datamodel import CommunicationsManager
 from org.sleuthkit.datamodel import TskCoreException
 from org.sleuthkit.datamodel.Blackboard import BlackboardException
-from org.sleuthkit.autopsy.casemodule import NoCurrentCaseException
+from org.sleuthkit.datamodel.blackboardutils import CommunicationArtifactsHelper
+from org.sleuthkit.datamodel.blackboardutils.CommunicationArtifactsHelper import CallMediaType
+from org.sleuthkit.datamodel.blackboardutils.CommunicationArtifactsHelper import CommunicationDirection
+from org.sleuthkit.datamodel.blackboardutils.CommunicationArtifactsHelper import MessageReadStatus
+from org.sleuthkit.datamodel.blackboardutils.attributes import MessageAttachments
+from org.sleuthkit.datamodel.blackboardutils.attributes.MessageAttachments import URLAttachment
 
 # Common Prefix Shared for all artefacts
-ARTIFACT_PREFIX = "Microsoft Teams "
+ARTIFACT_PREFIX = "Microsoft Teams"
+
 
 # Factory that defines the name and details of the module and allows Autopsy
 # to create instances of the modules that will do the analysis.
@@ -82,7 +78,7 @@ class ForensicIMIngestModuleFactory(IngestModuleFactoryAdapter):
     def __init__(self):
         self.settings = None
 
-    moduleName = "Forensics.im - Microsoft Teams Parser"
+    moduleName = "Microsoft Teams Parser"
 
     def getModuleDisplayName(self):
         return self.moduleName
@@ -91,7 +87,7 @@ class ForensicIMIngestModuleFactory(IngestModuleFactoryAdapter):
         return "Data Source-level Ingest Module for parsing Microsoft Team's LevelDb databases."
 
     def getModuleVersionNumber(self):
-        return "0.0.1"
+        return "1.4.00"
 
     def isDataSourceIngestModuleFactory(self):
         return True
@@ -132,16 +128,33 @@ class ForensicIMIngestModule(DataSourceIngestModule):
         blackboard = Case.getCurrentCase().getServices().getBlackboard()
 
         # Lets set up some custom attributes for the meetings
-        self.att_meeting_id = self.create_attribute_type('MST_MEETING_ID', BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.STRING, "Meeting ID", blackboard)
-        self.att_meeting_subject = self.create_attribute_type('MST_MEETING_SUBJECT', BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.STRING, "Meeting Subject", blackboard)
-        self.att_meeting_start = self.create_attribute_type('MST_MEETING_START', BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.DATETIME, "Meeting Start", blackboard)
-        self.att_meeting_end = self.create_attribute_type('MST_MEETING_END', BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.DATETIME, "Meeting End", blackboard)
-        self.att_meeting_organizer = self.create_attribute_type('MST_MEETING_ORGANIZER', BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.STRING, "Meeting Organizer", blackboard)
-        self.att_meeting_type = self.create_attribute_type('MST_MEETING_TYPE', BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.STRING, "Meeting Type", blackboard)
-        self.att_meeting_compose_time = self.create_attribute_type('MST_MEETING_COMPOSE_TIME', BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.DATETIME, "Compose Time", blackboard)
-        self.att_meeting_original_arrival_time = self.create_attribute_type('MST_MEETING_ORIGINAL_ARRIVAL_TIME', BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.DATETIME, "Original Arrival Time", blackboard)
-        self.att_meeting_client_arrival_time = self.create_attribute_type('MST_MEETING_CLIENT_ARRIVAL_TIME', BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.DATETIME, "Client Arrival Time", blackboard)
-
+        self.att_meeting_id = self.create_attribute_type('MST_MEETING_ID',
+                                                         BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.STRING,
+                                                         "Meeting ID", blackboard)
+        self.att_meeting_subject = self.create_attribute_type('MST_MEETING_SUBJECT',
+                                                              BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.STRING,
+                                                              "Meeting Subject", blackboard)
+        self.att_meeting_start = self.create_attribute_type('MST_MEETING_START',
+                                                            BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.DATETIME,
+                                                            "Meeting Start", blackboard)
+        self.att_meeting_end = self.create_attribute_type('MST_MEETING_END',
+                                                          BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.DATETIME,
+                                                          "Meeting End", blackboard)
+        self.att_meeting_organizer = self.create_attribute_type('MST_MEETING_ORGANIZER',
+                                                                BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.STRING,
+                                                                "Meeting Organizer", blackboard)
+        self.att_meeting_type = self.create_attribute_type('MST_MEETING_TYPE',
+                                                           BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.STRING,
+                                                           "Meeting Type", blackboard)
+        self.att_meeting_compose_time = self.create_attribute_type('MST_MEETING_COMPOSE_TIME',
+                                                                   BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.DATETIME,
+                                                                   "Compose Time", blackboard)
+        self.att_meeting_original_arrival_time = self.create_attribute_type('MST_MEETING_ORIGINAL_ARRIVAL_TIME',
+                                                                            BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.DATETIME,
+                                                                            "Original Arrival Time", blackboard)
+        self.att_meeting_client_arrival_time = self.create_attribute_type('MST_MEETING_CLIENT_ARRIVAL_TIME',
+                                                                          BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.DATETIME,
+                                                                          "Client Arrival Time", blackboard)
 
     def _parse_databases(self, content, progress_bar):
         # Create a temporary directory this directory will be used for temporarely storing the artefacts
@@ -201,51 +214,198 @@ class ForensicIMIngestModule(DataSourceIngestModule):
         if not os.path.exists(path_to_teams_json):
             raise IngestModuleException("Unable to find extracted data.")
 
-        # Lets attribute the messages to their respective source files
         imported_records = []
         with open(path_to_teams_json, "rb") as json_file:
             imported_records = json.load(json_file)
 
+        if imported_records is not None:
+            self._process_imported_records(imported_records, content, progress_bar)
+
+    def _process_imported_records(self, imported_records, content, progress_bar):
+        # Lets attribute the messages to their respective source files
         database_sub_files = [i for n, i in enumerate(imported_records) if
                               i.get('origin_file') not in [y.get('origin_file') for y in imported_records[n + 1:]]]
+        try:
+            for file in database_sub_files:
+                user_account_instance = None
+                teams_leveldb_file_path = self.get_level_db_file(content, file['origin_file'])
+                # Get only the records per file
+                records = [d for d in imported_records if d['origin_file'] == file['origin_file']]
+                try:
+                    user_account_instance = self.get_user_account(records)
+                except:
+                    self._logger.log(Level.WARNING, "Error querying for the user account from the LevelDB")
 
-        sleuthkit_case = Case.getCurrentCase().getSleuthkitCase()
-        module_name = ForensicIMIngestModuleFactory.moduleName
-        # Process all entries per file
-        # http://sleuthkit.org/sleuthkit/docs/jni-docs/4.10.2//classorg_1_1sleuthkit_1_1datamodel_1_1blackboardutils_1_1_communication_artifacts_helper.html#aede562cd1efd64588a052cb0013f42cd
-        progress_bar.switchToDeterminate(len(imported_records))
-        self.progress = 0
-        for file in database_sub_files:
-            db_file_path = self.get_level_db_file(content, file['origin_file'])
-            helper = CommunicationArtifactsHelper(sleuthkit_case, module_name, db_file_path, self.account)
-            # Get only the records per file
-            file_entries = [d for d in imported_records if d['origin_file'] == file['origin_file']]
+                current_case = Case.getCurrentCaseThrows()
+                if user_account_instance is None:
+                    helper = CommunicationArtifactsHelper(
+                        current_case.getSleuthkitCase(), ARTIFACT_PREFIX,
+                        teams_leveldb_file_path, self.account)
+                else:
+                    helper = CommunicationArtifactsHelper(
+                        current_case.getSleuthkitCase(), ARTIFACT_PREFIX,
+                        teams_leveldb_file_path, self.account,
+                        self.account, user_account_instance)
+                # parse the remaining artefacts
+                # contacts
+                contacts = [d for d in records if d['type'] == 'contact']
+                self.parse_contacts(contacts, helper)
 
-            # get the contacts first, all other message types can be linked based on the mri
-            contacts = [d for d in file_entries if d['type'] == 'contact']
-            self.parse_contacts(helper, contacts)
+                # calllogs
+                calllogs = [d for d in records if d['type'] == 'call']
+                self.parse_calllogs(calllogs, helper)
 
-            # get the messages
-            messages = [d for d in file_entries if d['type'] == 'message']
-            self.parse_messages(helper, messages)
+                # messages
+                messages = [d for d in records if d['type'] == 'message']
+                self.parse_messages(messages, helper)
 
-            # Update progressbar for every processed file, might not be linear
-            self.update_progress(progress_bar, len(messages))
+                # meetings does not have a convenient helper so we pass the file
+                meetings = [d for d in records if d['type'] == 'meeting']
+                self.parse_meetings(meetings, teams_leveldb_file_path)
 
-            # get the calls
-            calls = [d for d in file_entries if d['type'] == 'call']
-            self.parse_calls(helper, calls)
+        except NoCurrentCaseException as ex:
+            self._logger.log(Level.WARNING, "No case currently open.", ex)
 
-            # Update progressbar for every processed file, might not be linear
-            self.update_progress(progress_bar, len(calls))
+    def parse_contacts(self, contacts, helper):
+        # Todo possibly write a owner parser overriding the TskContactsParser, problem is that it expects a resultset
+        try:
+            for contact in contacts:
+                contact_name = contact['displayName']
+                contact_phone_number = None
+                contact_home_phone_number = None
+                contact_mobile_phone_number = None
+                contact_email = contact['email']
+                # ADD the TSK ID as an additional attribute
+                additional_attributes = ArrayList()
+                additional_attributes.add(
+                    BlackboardAttribute(BlackboardAttribute.ATTRIBUTE_TYPE.TSK_ID, ARTIFACT_PREFIX, contact['mri']))
+                helper.addContact(contact_name, contact_phone_number, contact_home_phone_number,
+                                  contact_mobile_phone_number, contact_email, additional_attributes)
+        except TskCoreException as e:
+            self._logger.log(Level.SEVERE,
+                             "Error adding Microsoft Teams contact artifacts to the case database.", e)
+        except BlackboardException as e:
+            self._logger.log(Level.WARNING,
+                             "Error posting contact artifact to the blackboard.", e)
 
-            # get the meetings
-            meetings = [d for d in file_entries if d['type'] == 'meeting']
-            self.parse_meetings(db_file_path, meetings)
+    def parse_calllogs(self, calls, helper):
+        # Query for call logs and iterate row by row adding
+        # each call log artifact
+        try:
+            for call in calls:
+                call_direction = self.deduce_call_direction(call['call-log']['callDirection'])
+                from_address = call['call-log']['originator']
+                to_address = call['call-log']['target']
+                start_date = self.date_to_long(call['call-log']['startTime'])
+                end_date = self.date_to_long(call['call-log']['endTime'])
+                # TODO implement call state, such as missed/accepted
+                helper.addCalllog(call_direction, from_address, to_address, start_date, end_date, CallMediaType.UNKNOWN)
+        except TskCoreException as ex:
+            # These exceptions are thrown by the CommunicationArtifactsHelper.
+            self._logger.log(Level.SEVERE,
+                             "Failed to add call log artifacts to the case database.", ex)
+        except BlackboardException as ex:
+            # Failed to post notification to blackboard
+            self._logger.log(Level.WARNING,
+                             "Failed to post call log artifact to the blackboard", ex)
 
-            # Update progressbar for every processed file, might not be linear
-            self.update_progress(progress_bar, len(meetings))
+    def parse_messages(self, messages, helper):
+        # Query for messages and iterate row by row adding
+        # each message artifact
+        try:
+            for message in messages:
+                message_type = ARTIFACT_PREFIX
+                # TODO Fix direction, possibly determine direction based on account name?
+                direction = CommunicationDirection.UNKNOWN
+                phone_number_from = message["creator"]
+                phone_number_to = ""
+                message_date_time = self.date_to_long(message['composetime'])
+                message_read_status = MessageReadStatus.UNKNOWN
+                subject = None
+                message_text = message["content"]
+                # Group by the conversationId, these can be direct messages, but also posts
+                thread_id = message["conversationId"]
+                # TODO Implement additional attributes
 
+                artifact = helper.addMessage(message_type, direction, phone_number_from, phone_number_to,
+                                             message_date_time,
+                                             message_read_status, subject, message_text, thread_id)
+
+                file_attachments = ArrayList()
+                url_attachments = ArrayList()
+
+                if message['nested_content'] is not None:
+                    for schema in message['nested_content']:
+                        for nc in schema:
+                            # Attach files like links, but need to get a different property
+                            if nc['@type'] == "http://schema.skype.com/File":
+                                url_attachments.add(URLAttachment(nc['objectUrl']))
+                            if nc['@type'] == "http://schema.skype.com/HyperLink":
+                                url_attachments.add(URLAttachment(nc['url']))
+                message_attachments = MessageAttachments(file_attachments, url_attachments)
+                helper.addAttachments(artifact, message_attachments)
+
+        except TskCoreException as ex:
+            # Severe error trying to add to case database.. case is not complete.
+            # These exceptions are thrown by the CommunicationArtifactsHelper.
+            self._logger.log(Level.SEVERE,
+                             "Failed to add message artifacts to the case database.", ex)
+        except BlackboardException as ex:
+            # Failed to post notification to blackboard
+            self._logger.log(Level.WARNING,
+                             "Failed to post message artifact to the blackboard", ex)
+
+    def parse_meetings(self, meetings, database_file):
+        try:
+            for meeting in meetings:
+                # TSK_CALENDAR_ENTRY http://sleuthkit.org/sleuthkit/docs/jni-docs/4.6/artifact_catalog_page.html
+                art = database_file.newArtifact(BlackboardArtifact.ARTIFACT_TYPE.TSK_CALENDAR_ENTRY)
+                # Required Attributes
+                calendar_entry_type = "Meeting"
+                calendar_entry_start_time = self.date_to_long(meeting["content"]["startTime"])
+                calendar_entry_description = meeting["content"]["subject"]
+                # Optional Attributes
+                calendar_entry_end_time = self.date_to_long(meeting["content"]["endTime"])
+                calendar_entry_organizer = meeting["content"]["organizerId"]
+
+                art.addAttribute(
+                    BlackboardAttribute(BlackboardAttribute.ATTRIBUTE_TYPE.TSK_CALENDAR_ENTRY_TYPE, ARTIFACT_PREFIX,
+                                        calendar_entry_type))
+                art.addAttribute(
+                    BlackboardAttribute(BlackboardAttribute.ATTRIBUTE_TYPE.TSK_DATETIME_START, ARTIFACT_PREFIX,
+                                        calendar_entry_start_time))
+                art.addAttribute(
+                    BlackboardAttribute(BlackboardAttribute.ATTRIBUTE_TYPE.TSK_DESCRIPTION, ARTIFACT_PREFIX,
+                                        calendar_entry_description))
+                art.addAttribute(
+                    BlackboardAttribute(BlackboardAttribute.ATTRIBUTE_TYPE.TSK_DATETIME_END, ARTIFACT_PREFIX,
+                                        calendar_entry_end_time))
+                art.addAttribute(
+                    BlackboardAttribute(BlackboardAttribute.ATTRIBUTE_TYPE.TSK_ID, ARTIFACT_PREFIX,
+                                        calendar_entry_organizer))
+                self.index_artifact(art)
+
+        except TskCoreException as ex:
+            # Severe error trying to add to case database.. case is not complete.
+            # These exceptions are thrown by the CommunicationArtifactsHelper.
+            self._logger.log(Level.SEVERE,
+                             "Failed to add message artifacts to the case database.", ex)
+        except BlackboardException as ex:
+            # Failed to post notification to blackboard
+            self._logger.log(Level.WARNING,
+                             "Failed to post message artifact to the blackboard", ex)
+
+    def index_artifact(self, artifact):
+        # Index the artifact for keyword search
+        try:
+            blackboard = Case.getCurrentCase().getServices().getBlackbaord()
+            blackboard.indexArtifact(artifact)
+        except BlackboardException as ex:
+            self._logger.log(Level.SEVERE, "Failed to index artifact.", ex)
+
+    def get_user_account(self, records):
+        # TODO Fix lookup mechanism
+        return None
 
     def update_progress(self, progress_bar, items_processed):
         self.progress += items_processed
@@ -271,65 +431,20 @@ class ForensicIMIngestModule(DataSourceIngestModule):
         timestamp = int(calendar.timegm(time_struct))
         return timestamp
 
-    def parse_meetings(self, db_file_path, meetings):
-        blackboard = Case.getCurrentCase().getServices().getBlackboard()
-        # Create custom artefacts, because meetings do not exist in Autopsy
-        self.art_meeting = self.create_artifact_type("MST_MEETING", "Meetings", blackboard)
-        art = db_file_path.newArtifact(self.art_meeting.getTypeID())
-        for meeting in meetings:
-            # Add the subject as a test attribute to the artefact
-            art.addAttribute(BlackboardAttribute(self.att_meeting_subject, ForensicIMIngestModuleFactory.moduleName, meeting["content"]["subject"]))
-            art.addAttribute(BlackboardAttribute(self.att_meeting_id, ForensicIMIngestModuleFactory.moduleName, meeting["id"]))
-            art.addAttribute(BlackboardAttribute(self.att_meeting_start, ForensicIMIngestModuleFactory.moduleName, self.date_to_long(meeting["content"]["startTime"])))
-            art.addAttribute(BlackboardAttribute(self.att_meeting_end, ForensicIMIngestModuleFactory.moduleName, self.date_to_long(meeting["content"]["endTime"])))
-            art.addAttribute(BlackboardAttribute(self.att_meeting_organizer, ForensicIMIngestModuleFactory.moduleName, meeting["content"]["organizerId"]))
-            art.addAttribute(BlackboardAttribute(self.att_meeting_type, ForensicIMIngestModuleFactory.moduleName, meeting["content"]["meetingType"]))
-            art.addAttribute(BlackboardAttribute(self.att_meeting_compose_time, ForensicIMIngestModuleFactory.moduleName, self.date_to_long(meeting["composetime"])))
-            art.addAttribute(BlackboardAttribute(self.att_meeting_original_arrival_time, ForensicIMIngestModuleFactory.moduleName, self.date_to_long(meeting["originalarrivaltime"])))
-            art.addAttribute(BlackboardAttribute(self.att_meeting_client_arrival_time, ForensicIMIngestModuleFactory.moduleName, self.date_to_long(meeting["clientArrivalTime"])))
-
-        # TODO implement Indexing
-
-    def parse_calls(self, app_db_helper, calls):
-        for call in calls:
-            from_address = call['call-log']['originator']
-            to_address = call['call-log']['target']
-            start_date = self.date_to_long(call['call-log']['startTime'])
-            end_date = self.date_to_long(call['call-log']['endTime'])
-            call_direction = CommunicationDirection.UNKNOWN
-
-            if call['call-log']['callDirection'] == 'incoming':
+    # Extract the direction of a phone call
+    def deduce_call_direction(self, direction):
+        call_direction = CommunicationDirection.UNKNOWN
+        if direction is not None:
+            if direction == 'incoming':
                 call_direction = CommunicationDirection.INCOMING
-            elif call['call-log']['callDirection'] == 'outgoing':
+            elif direction == 'outgoing':
                 call_direction = CommunicationDirection.OUTGOING
-
-            # TODO implement call state, such as missed/accepted
-            app_db_helper.addCalllog(call_direction, from_address, to_address, start_date, end_date, CallMediaType.UNKNOWN)
-
-    def parse_contacts(self, app_db_helper, contacts):
-
-        try:
-            for contact in contacts:
-                # contact_account_id = contact['mri']
-                contact_name = contact['displayName']
-                contact_phone_number = contact['mri']
-                contact_home_phone_number = None
-                contact_mobile_phone_number = None
-                contact_email = contact['email']
-                additionalAttributes = ArrayList()
-                # additionalAttributes.add(BlackboardAttribute(BlackboardAttribute.ATTRIBUTE_TYPE.TSK_ID, "Microsoft Teams", contact['mri']))
-                app_db_helper.addContact(contact_name, contact_phone_number, contact_home_phone_number, contact_mobile_phone_number, contact_email, additionalAttributes)
-        except TskCoreException as e:
-            self._logger.log(Level.SEVERE,
-                             "Error adding Microsoft Teams contact artifacts to the case database.", e)
-        except BlackboardException as e:
-            self._logger.log(Level.WARNING,
-                             "Error posting contact artifact to the blackboard.", e)
-
+            return call_direction
+    
     def create_artifact_type(self, artifact_name, artifact_description, blackboard):
         try:
             artifact = blackboard.getOrAddArtifactType(artifact_name, ARTIFACT_PREFIX + artifact_description)
-        except Exception as e :
+        except Exception as e:
             self.log(Level.INFO, "Error getting or adding artifact type: {} {}".format(artifact_description, str(e)))
         return artifact
 
@@ -339,47 +454,6 @@ class ForensicIMIngestModule(DataSourceIngestModule):
         except Exception as e:
             self.log(Level.INFO, "Error getting or adding attribute type: {} {}".format(attribute_description, str(e)))
         return attribute
-
-    def parse_messages(self, app_db_helper, messages):
-        # We will use the integrated add message function to add a TSK_MESSAGE
-        # http://sleuthkit.org/autopsy/docs/api-docs/4.12.0//classorg_1_1sleuthkit_1_1autopsy_1_1coreutils_1_1_app_d_b_parser_helper.html#a630bb70bee171df941e363693a1795f3
-        for message in messages:
-            message_type = "Microsoft Teams"
-            # TODO Change back an email address
-            from_address = message["creator"]
-
-            to_address = ""
-            subject = None
-            message_text = message["content"]
-            timestamp = self.date_to_long(message['composetime'])
-
-            # Group by the conversationId, these can be direct messages, but also posts
-            thread_id = message["conversationId"]
-            # TODO Fix direction, possibly determine direction based on account name?
-            direction = CommunicationDirection.UNKNOWN
-
-            # TODO Additional attributes
-
-            additional_attributes = ArrayList()
-            #additional_attributes.add(BlackboardAttribute(BlackboardAttribute.ATTRIBUTE_TYPE.TSK_DATETIME_MODIFIED, "Microsoft Teams", self.date_to_long(message['edited'])))
-            #additional_attributes.add(BlackboardAttribute(BlackboardAttribute.ATTRIBUTE_TYPE.TSK_TEXT, "Microsoft Teams", message['emotion']))
-            # Create the actual artefact in blackboard
-            artifact = app_db_helper.addMessage(message_type, direction, from_address, to_address, timestamp,
-                                                MessageReadStatus.UNKNOWN, subject, message_text, thread_id, additional_attributes)
-
-            file_attachments = ArrayList()
-            url_attachments = ArrayList()
-
-            if message['nested_content'] is not None:
-                for schema in message['nested_content']:
-                    for nc in schema:
-                        # Attach files like links, but need to get a different property
-                        if nc['@type'] == "http://schema.skype.com/File":
-                            url_attachments.add(URLAttachment(nc['objectUrl']))
-                        if nc['@type'] == "http://schema.skype.com/HyperLink":
-                            url_attachments.add(URLAttachment(nc['url']))
-            message_attachments = MessageAttachments(file_attachments, url_attachments)
-            app_db_helper.addAttachments(artifact, message_attachments)
 
     def process(self, data_source, progress_bar):
 
