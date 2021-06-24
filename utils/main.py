@@ -263,6 +263,11 @@ def determine_record_type(record):
                         else:
                             cleaned_record[b'edited'] = None
 
+                        if b'\x08isFromMeT' in key_values:
+                            cleaned_record[b'isFromMe'] = True
+                        else:
+                            cleaned_record[b'isFromMe'] = False
+
                         # Patch the content of messages by specifically looking for divs
                         cleaned_record[b'content'] = strip_html_tags(get_content(r))
 
