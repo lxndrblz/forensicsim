@@ -1,7 +1,6 @@
 import ast
 import json
 from datetime import datetime
-from datetime import date
 from pathlib import Path
 
 import click
@@ -185,7 +184,7 @@ def determine_record_type(record):
                              b'creator']},
         'call': {'identifier': {b'messagetype': 'RichText/Html', b'contenttype': 'text'},
                  'fields': [b'messagetype', b'originalarrivaltime', b'clientArrivalTime', b'clientmessageid',
-                            b'composetime', b'originalarrivaltime', b'clientArrivalTime', b'call-log']},
+                            b'composetime', b'originalarrivaltime', b'clientArrivalTime', b'call-log', b'creator']},
         'message': {'identifier': {b'messageKind': 'skypeMessageLocal', b'contenttype': 'text'},
                     'fields': [b'conversationId', b'messagetype', b'contenttype', b'imdisplayname',
                                b'clientmessageid', b'composetime', b'originalarrivaltime', b'creator',
@@ -278,6 +277,12 @@ def determine_record_type(record):
                     elif key == 'call':
                         call_details = get_call(r)
                         cleaned_record[b'call-log'] = call_details
+
+                    # Manually construct the cache deduplication key
+                    if b'cachedDeduplicationKey' not in cleaned_records:
+                        if cleaned_record[b'creator'] is not None and cleaned_record[b'clientmessageid'] is not None:
+                            cleaned_record[b'cachedDeduplicationKey'] = cleaned_record[b'creator'] + cleaned_record[
+                                b'clientmessageid']
                     cleaned_records.append(cleaned_record)
 
     return cleaned_records
@@ -319,6 +324,7 @@ def parse_records(fetched_ldb_records, outputpath):
 
     write_results_to_json(parsed_records, outputpath)
 
+
 def parse_message_reaction(messages):
     messages.sort(key=lambda date: datetime.strptime(date['composetime'][:19], "%Y-%m-%dT%H:%M:%S"))
 
@@ -345,10 +351,7 @@ def parse_text_message(messages):
         print(f"Compose Time: {m['composetime'][:19]} - User: {m['imdisplayname']} - Message: {m['content']}")
 
 
-def write_results_to_json(data, outputpath):
-    # Dump messages into a json file
-    with open(outputpath, 'w') as f:
-        json.dump(data, f)
+
 
 
 def read_input(filepath, outputpath):
