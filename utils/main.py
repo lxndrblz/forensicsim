@@ -2,8 +2,9 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-import click
 import pyfiglet
+import argparse
+
 from bs4 import BeautifulSoup
 
 import shared
@@ -114,7 +115,7 @@ def parse_conversations(conversations):
         x['origin_file'] = conversation['origin_file']
         if x['type'] == 'Meeting':
             # assign the type for further processing as the object store might not be sufficient
-            x['meeting'] = json.loads(x['meeting'])
+            x['threadProperties']['meeting'] = json.loads(x['threadProperties']['meeting'])
             x['record_type'] = 'meeting'
             cleaned.append(x)
         # Other types include Message, Chat, Space
@@ -173,17 +174,23 @@ def process_db(filepath, output_path):
     # write the output to a json file
     shared.write_results_to_json(parsed_records, output_path)
 
+def run(args):
+    process_db(args.filepath, args.outputpath)
 
-@click.command()
-@click.option('--filepath', '-f', required=True,
-              default="\IndexedDB\https_teams.microsoft.com_0.indexeddb.leveldb",
-              help="Relative file path to JSON with conversation data")
-@click.option('--outputpath', '-o', required=True, default='teams.json',
-              help="Relative file path to JSON with conversation data")
-def cli(filepath, outputpath):
+def parse_cmdline():
+    description = 'Forensics.im Xtract Tool'
+    parser = argparse.ArgumentParser(description=description)
+    required_group = parser.add_argument_group('required arguments')
+    required_group.add_argument('--filepath', required=True, help='File path to the IndexedDB.')
+    required_group.add_argument('--outputpath', required=True, help='File path to the procesed output.')
+    args = parser.parse_args()
+    return args
+
+def cli():
     header = pyfiglet.figlet_format("Forensics.im Xtract Tool")
-    click.echo(header)
-    process_db(filepath, outputpath)
+    print(header)
+    args = parse_cmdline()
+    run(args)
 
 
 if __name__ == '__main__':

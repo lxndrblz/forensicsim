@@ -176,9 +176,9 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                                                                                           path_to_teams_json))
         cmd = ArrayList()
         cmd.add(self.path_to_executable)
-        cmd.add("-f")
+        cmd.add("--filepath")
         cmd.add(path)
-        cmd.add("-o")
+        cmd.add("--outputpath")
         cmd.add(path_to_teams_json)
         process_builder = ProcessBuilder(cmd)
         ExecUtil.execute(process_builder, DataSourceIngestModuleProcessTerminator(self.context))
@@ -471,9 +471,6 @@ class ForensicIMIngestModule(DataSourceIngestModule):
         directories_to_process = len(all_ms_teams_leveldbs)
 
         self.log(Level.INFO, "Found {} Microsoft Teams directories to process.".format(directories_to_process))
-        message = IngestMessage.createMessage(IngestMessage.MessageType.DATA, ForensicIMIngestModuleFactory.moduleName,
-                                              "Found {} Microsoft Teams directories to process.".format(directories_to_process))
-        IngestServices.getInstance().postMessage(message)
 
         for i, content in enumerate(all_ms_teams_leveldbs):
             # Check if the user pressed cancel while we are processing the files

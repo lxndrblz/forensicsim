@@ -17,12 +17,8 @@ def parse_db(filepath):
     extracted_values = []
     for wrapped_db in wrapper.database_ids:
         db = wrapper[wrapped_db.dbid_no]
-        print("***** Processing Database *****")
-        print(f"database number: {db.db_number} database name: {db.name} database origin: {db.origin}")
-        print("*** Processing Object Stores ***")
         for object_store_name in db.object_store_names:
             object_store = db[object_store_name]
-            print(f"object stored id: {object_store.object_store_id} object store name: {object_store.name}")
             try:
                 for record in object_store.iterate_records():
                     extracted_values.append({'database': db.name, 'store': object_store.name, 'value': record.value, 'origin_file': record.origin_file})
