@@ -31,9 +31,9 @@ import dataclasses
 import types
 import typing
 
-import ccl_leveldb
-import ccl_v8_value_deserializer
-import ccl_blink_value_deserializer
+from . import ccl_leveldb
+from . import ccl_v8_value_deserializer
+from . import ccl_blink_value_deserializer
 
 __version__ = "0.6"
 __description__ = "Module for reading Chromium IndexedDB LevelDB databases."
@@ -292,7 +292,7 @@ class ObjectStoreMetadata:
 class IndexedDbRecord:
     def __init__(
             self, owner: "IndexedDb", db_id: int, obj_store_id: int, key: IdbKey,
-            value: typing.Any, is_live: bool, ldb_seq_no: int):
+            value: typing.Any, is_live: bool, ldb_seq_no: int, origin_file: os.PathLike):
         self.owner = owner
         self.db_id = db_id
         self.obj_store_id = obj_store_id
@@ -300,6 +300,7 @@ class IndexedDbRecord:
         self.value = value
         self.is_live = is_live
         self.sequence_number = ldb_seq_no
+        self.origin_file = origin_file
 
     def resolve_blob_index(self, blob_index: ccl_blink_value_deserializer.BlobIndex) -> IndexedDBExternalObject:
         """Resolve a ccl_blink_value_deserializer.BlobIndex to its IndexedDBExternalObject
@@ -463,7 +464,7 @@ class IndexedDb:
                         continue
                     raise
                 yield IndexedDbRecord(self, db_id, store_id, key, value,
-                                      record.state == ccl_leveldb.KeyState.Live, record.seq)
+                                      record.state == ccl_leveldb.KeyState.Live, record.seq, record.origin_file)
 
     def get_blob_info(self, db_id: int, store_id: int, raw_key: bytes, file_index: int) -> IndexedDBExternalObject:
         if db_id > 0x7f or store_id > 0x7f:

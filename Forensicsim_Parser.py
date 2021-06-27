@@ -67,6 +67,7 @@ from org.sleuthkit.datamodel.blackboardutils.CommunicationArtifactsHelper import
 from org.sleuthkit.datamodel.blackboardutils.attributes import MessageAttachments
 from org.sleuthkit.datamodel.blackboardutils.attributes.MessageAttachments import URLAttachment
 
+
 # Common Prefix Shared for all artefacts
 ARTIFACT_PREFIX = "Microsoft Teams"
 
@@ -127,35 +128,6 @@ class ForensicIMIngestModule(DataSourceIngestModule):
 
         blackboard = Case.getCurrentCase().getServices().getBlackboard()
 
-        # Lets set up some custom attributes for the meetings
-        self.att_meeting_id = self.create_attribute_type('MST_MEETING_ID',
-                                                         BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.STRING,
-                                                         "Meeting ID", blackboard)
-        self.att_meeting_subject = self.create_attribute_type('MST_MEETING_SUBJECT',
-                                                              BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.STRING,
-                                                              "Meeting Subject", blackboard)
-        self.att_meeting_start = self.create_attribute_type('MST_MEETING_START',
-                                                            BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.DATETIME,
-                                                            "Meeting Start", blackboard)
-        self.att_meeting_end = self.create_attribute_type('MST_MEETING_END',
-                                                          BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.DATETIME,
-                                                          "Meeting End", blackboard)
-        self.att_meeting_organizer = self.create_attribute_type('MST_MEETING_ORGANIZER',
-                                                                BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.STRING,
-                                                                "Meeting Organizer", blackboard)
-        self.att_meeting_type = self.create_attribute_type('MST_MEETING_TYPE',
-                                                           BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.STRING,
-                                                           "Meeting Type", blackboard)
-        self.att_meeting_compose_time = self.create_attribute_type('MST_MEETING_COMPOSE_TIME',
-                                                                   BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.DATETIME,
-                                                                   "Compose Time", blackboard)
-        self.att_meeting_original_arrival_time = self.create_attribute_type('MST_MEETING_ORIGINAL_ARRIVAL_TIME',
-                                                                            BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.DATETIME,
-                                                                            "Original Arrival Time", blackboard)
-        self.att_meeting_client_arrival_time = self.create_attribute_type('MST_MEETING_CLIENT_ARRIVAL_TIME',
-                                                                          BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.DATETIME,
-                                                                          "Client Arrival Time", blackboard)
-
     def _parse_databases(self, content, progress_bar):
         # Create a temporary directory this directory will be used for temporarely storing the artefacts
         try:
@@ -204,9 +176,9 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                                                                                           path_to_teams_json))
         cmd = ArrayList()
         cmd.add(self.path_to_executable)
-        cmd.add("-f")
+        cmd.add("--filepath")
         cmd.add(path)
-        cmd.add("-o")
+        cmd.add("--outputpath")
         cmd.add(path_to_teams_json)
         process_builder = ProcessBuilder(cmd)
         ExecUtil.execute(process_builder, DataSourceIngestModuleProcessTerminator(self.context))
@@ -248,19 +220,19 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                         self.account, user_account_instance)
                 # parse the remaining artefacts
                 # contacts
-                contacts = [d for d in records if d['type'] == 'contact']
+                contacts = [d for d in records if d['record_type'] == 'contact']
                 self.parse_contacts(contacts, helper)
 
                 # calllogs
-                calllogs = [d for d in records if d['type'] == 'call']
+                calllogs = [d for d in records if d['record_type'] == 'call']
                 self.parse_calllogs(calllogs, helper)
 
                 # messages
-                messages = [d for d in records if d['type'] == 'message']
+                messages = [d for d in records if d['record_type'] == 'message']
                 self.parse_messages(messages, helper)
 
                 # meetings does not have a convenient helper so we pass the file
-                meetings = [d for d in records if d['type'] == 'meeting']
+                meetings = [d for d in records if d['record_type'] == 'meeting']
                 self.parse_meetings(meetings, teams_leveldb_file_path)
 
         except NoCurrentCaseException as ex:
@@ -329,10 +301,11 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                 message_date_time_edited = 0
                 message_date_time_deleted = 0
 
-                if message['edited'] is not None:
-                    message_date_time_edited = self.date_to_long(message['edited'])
-                if message['deleted'] is not None:
-                    message_date_time_deleted = self.date_to_long(message['deleted'])
+                if 'edittime' in message['properties']:
+                    message_date_time_edited = int(message['properties']['edittime'])
+                if 'deletetime' in message['properties']:
+                    message_date_time_edited = int(message['properties']['deletetime'])
+
                 additional_attributes = ArrayList()
                 additional_attributes.add(
                     BlackboardAttribute(BlackboardAttribute.ATTRIBUTE_TYPE.TSK_DATETIME_MODIFIED, ARTIFACT_PREFIX,
@@ -349,14 +322,18 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                 file_attachments = ArrayList()
                 url_attachments = ArrayList()
 
-                if message['nested_content'] is not None:
-                    for schema in message['nested_content']:
-                        for nc in schema:
-                            # Attach files like links, but need to get a different property
-                            if nc['@type'] == "http://schema.skype.com/File":
-                                url_attachments.add(URLAttachment(nc['objectUrl']))
-                            if nc['@type'] == "http://schema.skype.com/HyperLink":
-                                url_attachments.add(URLAttachment(nc['url']))
+                # process the attachments
+                if 'attachments' in message:
+                    if message['attachments'] is not None:
+                        for attachment in message['attachments']:
+                            # Attach files like links
+                            url_attachments.add(URLAttachment(attachment['objectUrl']))
+                # process links
+                if 'properties' in message:
+                    if 'links' in message['properties']:
+                        for link in message['properties']['links']:
+                            url_attachments.add(URLAttachment(link['url']))
+
                 message_attachments = MessageAttachments(file_attachments, url_attachments)
                 helper.addAttachments(artifact, message_attachments)
 
@@ -377,11 +354,11 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                 art = database_file.newArtifact(BlackboardArtifact.ARTIFACT_TYPE.TSK_CALENDAR_ENTRY)
                 # Required Attributes
                 calendar_entry_type = "Meeting"
-                calendar_entry_start_time = self.date_to_long(meeting["content"]["startTime"])
-                calendar_entry_description = meeting["content"]["subject"]
+                calendar_entry_start_time = self.date_to_long(meeting["threadProperties"]['meeting']["startTime"])
+                calendar_entry_description = meeting["threadProperties"]['meeting']["subject"]
                 # Optional Attributes
-                calendar_entry_end_time = self.date_to_long(meeting["content"]["endTime"])
-                calendar_entry_organizer = meeting["content"]["organizerId"]
+                calendar_entry_end_time = self.date_to_long(meeting["threadProperties"]['meeting']["endTime"])
+                calendar_entry_organizer = meeting["threadProperties"]['meeting']["organizerId"]
 
                 art.addAttribute(
                     BlackboardAttribute(BlackboardAttribute.ATTRIBUTE_TYPE.TSK_CALENDAR_ENTRY_TYPE, ARTIFACT_PREFIX,
