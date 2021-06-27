@@ -109,15 +109,20 @@ def parse_reply_chain(reply_chains):
 def parse_conversations(conversations):
     cleaned = []
     for conversation in conversations:
-        value = conversation['value']
-        x = extract_fields(value, 'conversation')
-        # Include file origin for records
-        x['origin_file'] = conversation['origin_file']
-        if x['type'] == 'Meeting':
-            # assign the type for further processing as the object store might not be sufficient
-            x['threadProperties']['meeting'] = json.loads(x['threadProperties']['meeting'])
-            x['record_type'] = 'meeting'
-            cleaned.append(x)
+        try:
+            value = conversation['value']
+            x = extract_fields(value, 'conversation')
+            # Include file origin for records
+            x['origin_file'] = conversation['origin_file']
+            if x['type'] == 'Meeting':
+                # assign the type for further processing as the object store might not be sufficient
+                if 'threadProperties' in x:
+                    if 'meeting' in x['threadProperties']:
+                        x['threadProperties']['meeting'] = json.loads(x['threadProperties']['meeting'])
+                        x['record_type'] = 'meeting'
+                        cleaned.append(x)
+        except UnicodeDecodeError:
+            print("Could not decode meeting.")
         # Other types include Message, Chat, Space
     return cleaned
 
