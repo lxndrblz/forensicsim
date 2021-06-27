@@ -1,6 +1,6 @@
 from pathlib import Path
 
-import click
+import argparse
 import pyfiglet
 
 import shared
@@ -25,16 +25,23 @@ def process_db(filepath, output_path):
     shared.write_results_to_json(extracted_values, output_path)
 
 
-@click.command()
-@click.option('--filepath', '-f', required=True,
-              default="\IndexedDB\https_teams.microsoft.com_0.indexeddb.leveldb",
-              help="Relative file path to JSON with conversation data")
-@click.option('--outputpath', '-o', required=True, default='teams.json',
-              help="Relative file path to JSON with conversation data")
-def cli(filepath, outputpath):
-    header = pyfiglet.figlet_format("Forensics.im Dump Tool")
-    click.echo(header)
-    process_db(filepath, outputpath)
+def run(args):
+    process_db(args.filepath, args.outputpath)
+
+def parse_cmdline():
+    description = 'Forensics.im Dump Tool'
+    parser = argparse.ArgumentParser(description=description)
+    required_group = parser.add_argument_group('required arguments')
+    required_group.add_argument('--filepath', required=True, help='File path to the IndexedDB.')
+    required_group.add_argument('--outputpath', required=True, help='File path to the procesed output.')
+    args = parser.parse_args()
+    return args
+
+def cli():
+    header = pyfiglet.figlet_format("Forensics.im Xtract Tool")
+    print(header)
+    args = parse_cmdline()
+    run(args)
 
 
 if __name__ == '__main__':
