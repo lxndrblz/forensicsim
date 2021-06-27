@@ -26,9 +26,7 @@ def parse_db(filepath):
             print(f"object stored id: {object_store.object_store_id} object store name: {object_store.name}")
             try:
                 for record in object_store.iterate_records():
-                    # TODO fix origin_file it should be set the ldb or manifest file
-                    extracted_values.append(
-                        {'database': db.name, 'store': object_store.name, 'value': record.value, 'origin_file': db.origin})
+                    extracted_values.append({'database': db.name, 'store': object_store.name, 'value': record.value, 'origin_file': record.origin_file})
             except StopIteration as e:
                 print(e)
     return extracted_values
