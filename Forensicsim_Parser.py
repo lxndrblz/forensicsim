@@ -248,19 +248,19 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                         self.account, user_account_instance)
                 # parse the remaining artefacts
                 # contacts
-                contacts = [d for d in records if d['type'] == 'contact']
+                contacts = [d for d in records if d['record_type'] == 'contact']
                 self.parse_contacts(contacts, helper)
 
                 # calllogs
-                calllogs = [d for d in records if d['type'] == 'call']
+                calllogs = [d for d in records if d['record_type'] == 'call']
                 self.parse_calllogs(calllogs, helper)
 
                 # messages
-                messages = [d for d in records if d['type'] == 'message']
+                messages = [d for d in records if d['record_type'] == 'message']
                 self.parse_messages(messages, helper)
 
                 # meetings does not have a convenient helper so we pass the file
-                meetings = [d for d in records if d['type'] == 'meeting']
+                meetings = [d for d in records if d['record_type'] == 'meeting']
                 self.parse_meetings(meetings, teams_leveldb_file_path)
 
         except NoCurrentCaseException as ex:
@@ -346,19 +346,20 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                                              message_read_status, subject, message_text, thread_id,
                                              additional_attributes)
 
-                file_attachments = ArrayList()
-                url_attachments = ArrayList()
-
-                if message['nested_content'] is not None:
-                    for schema in message['nested_content']:
-                        for nc in schema:
-                            # Attach files like links, but need to get a different property
-                            if nc['@type'] == "http://schema.skype.com/File":
-                                url_attachments.add(URLAttachment(nc['objectUrl']))
-                            if nc['@type'] == "http://schema.skype.com/HyperLink":
-                                url_attachments.add(URLAttachment(nc['url']))
-                message_attachments = MessageAttachments(file_attachments, url_attachments)
-                helper.addAttachments(artifact, message_attachments)
+                # TODO refactor attachments
+                # file_attachments = ArrayList()
+                # url_attachments = ArrayList()
+                #
+                # if message['nested_content'] is not None:
+                #     for schema in message['nested_content']:
+                #         for nc in schema:
+                #             # Attach files like links, but need to get a different property
+                #             if nc['@type'] == "http://schema.skype.com/File":
+                #                 url_attachments.add(URLAttachment(nc['objectUrl']))
+                #             if nc['@type'] == "http://schema.skype.com/HyperLink":
+                #                 url_attachments.add(URLAttachment(nc['url']))
+                # message_attachments = MessageAttachments(file_attachments, url_attachments)
+                # helper.addAttachments(artifact, message_attachments)
 
         except TskCoreException as ex:
             # Severe error trying to add to case database.. case is not complete.
@@ -377,11 +378,11 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                 art = database_file.newArtifact(BlackboardArtifact.ARTIFACT_TYPE.TSK_CALENDAR_ENTRY)
                 # Required Attributes
                 calendar_entry_type = "Meeting"
-                calendar_entry_start_time = self.date_to_long(meeting["content"]["startTime"])
-                calendar_entry_description = meeting["content"]["subject"]
+                calendar_entry_start_time = self.date_to_long(meeting["threadProperties"]["startTime"])
+                calendar_entry_description = meeting["threadProperties"]["subject"]
                 # Optional Attributes
-                calendar_entry_end_time = self.date_to_long(meeting["content"]["endTime"])
-                calendar_entry_organizer = meeting["content"]["organizerId"]
+                calendar_entry_end_time = self.date_to_long(meeting["threadProperties"]["endTime"])
+                calendar_entry_organizer = meeting["threadProperties"]["organizerId"]
 
                 art.addAttribute(
                     BlackboardAttribute(BlackboardAttribute.ATTRIBUTE_TYPE.TSK_CALENDAR_ENTRY_TYPE, ARTIFACT_PREFIX,

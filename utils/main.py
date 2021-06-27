@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from pathlib import Path
 
@@ -8,13 +9,11 @@ from bs4 import BeautifulSoup
 import shared
 
 MESSAGE_TYPES = {
-    'message': {'creator','conversationId','content', 'composetime', 'originalarrivaltime','clientArrivalTime','cachedDeduplicationKey', 'isFromMe', 'createdTime', 'clientmessageid','contenttype', 'messagetype', 'version', 'messageKind', 'properties', 'attachments'},
-    'contact': {'displayName', 'mri', 'email', 'userPrincipalName'}
-}
-
-IDENTIFIER = {
-    'message': {'identifier': {'messagetype': 'RichText/Html'}},
-    'meeting': {'identifier': {'messagetype': 'ThreadActivity/TopicUpdate'}}
+    'message': {'creator', 'conversationId', 'content', 'composetime', 'originalarrivaltime',
+                'clientArrivalTime', 'isFromMe', 'createdTime', 'clientmessageid', 'contenttype', 'messagetype',
+                'version', 'messageKind', 'properties', 'attachments'},
+    'contact': {'displayName', 'mri', 'email', 'userPrincipalName'},
+    'conversation': {'version', 'members', 'clientUpdateTime', 'id', 'threadProperties', 'type'}
 }
 
 
@@ -28,24 +27,13 @@ def strip_html_tags(value):
         return value
 
 
-
-
-
 def convert_time_stamps(content_utf8_encoded):
     # timestamp appear in epoch format with milliseconds alias currentmillis
     # Convert data to neat timestamp
-    delete_time_datetime = datetime.utcfromtimestamp(int(content_utf8_encoded) / 1000)
-    delete_time_string = delete_time_datetime.strftime('%Y-%m-%dT%H:%M:%S.%f')
+    converted_time_datetime = datetime.utcfromtimestamp(int(content_utf8_encoded) / 1000)
+    converted_time_string = converted_time_datetime.strftime('%Y-%m-%dT%H:%M:%S.%f')
 
-    return str(delete_time_string)
-
-def parse_text_message(messages):
-    # messages.sort(key=lambda date: datetime.strptime(date['composetime'][:19], "%Y-%m-%dT%H:%M:%S"))
-
-    # Print the text messages
-    for m in messages:
-        print(m['value'])
-        # print(f"Compose Time: {m['composetime'][:19]} - User: {m['imdisplayname']} - Message: {m['content']}")
+    return str(converted_time_string)
 
 
 def extract_fields(record, keys):
@@ -53,74 +41,100 @@ def extract_fields(record, keys):
     extracted_record = {key: record[key] for key in record.keys() & keys_by_message_type}
     return extracted_record
 
+
 def parse_contacts(contacts):
     cleaned = []
     for contact in contacts:
         value = contact['value']
         x = extract_fields(value, 'contact')
+        x['record_type'] = 'contact'
         cleaned.append(x)
 
-    # Deduplicate based on mri
+    # Deduplicate based on mri - should be unique anyway
     cleaned = deduplicate(cleaned, 'mri')
-    for c in cleaned:
-        print(c)
 
-def parse_conversation(conversations):
+    return cleaned
+
+
+def parse_reply_chain(reply_chains):
     cleaned = []
-    for conversation in conversations:
+    for conversation in reply_chains:
         value = conversation['value']
         message = value['messages']
         for key, value in message.items():
+            # parse as a normal chat message
 
             x = extract_fields(value, 'message')
-            x['content'] = strip_html_tags(x['content'])
-            # convert the timestamps
-            x['createdTime'] = convert_time_stamps(x['createdTime'])
-            x['version'] = convert_time_stamps(x['version'])
-
-            cleaned.append(x)
-
+            # Files send without any description will be of type text
+            if x['messagetype'] == 'RichText/Html' or x['messagetype'] == 'Text':
+                # Get the call logs
+                if 'call-log' in x['properties']:
+                    # call logs are string escaped
+                    call_log = json.loads(value['properties']['call-log'])
+                    x['call-log'] = call_log
+                    x['record_type'] = 'call'
+                # Get the reactions from the chat
+                if 'activity' in x['properties']:
+                    # reactionInChat are for personal conversations, reactions are for posts or comments
+                    if x['properties']['activity']['activityType'] == 'reactionInChat' or 'reaction':
+                        x['record_type'] = 'reaction'
+                else:
+                    # normal message, posts, file transfers
+                    x['content'] = strip_html_tags(x['content'])
+                    x['record_type'] = 'message'
+                # convert the timestamps
+                x['createdTime'] = convert_time_stamps(x['createdTime'])
+                x['version'] = convert_time_stamps(x['version'])
+                # manually construct the cachedDeduplicationKey, because not every replychain appears to have it
+                x['cachedDeduplicationKey'] = str(x['creator']+x['clientmessageid'])
+                cleaned.append(x)
+            # Other types include ThreadActivity/TopicUpdate and ThreadActivity/AddMember
+            # -> ThreadActivity/TopicUpdate occurs for meeting updates
+            # -> ThreadActivity/AddMember occurs when someone gets added to a chat
 
     # Deduplicate
     cleaned = deduplicate(cleaned, 'cachedDeduplicationKey')
-    # Sort by Date
-    cleaned.sort(key=lambda date: datetime.strptime(date['composetime'][:19], "%Y-%m-%dT%H:%M:%S"))
+    return cleaned
 
-    for c in cleaned:
-        print(c)
 
-def parse_calendar_events(events):
+def parse_conversations(conversations):
     cleaned = []
-    for event in events:
-        value = event['value']
-        print(value)
+    for conversation in conversations:
+        value = conversation['value']
+        x = extract_fields(value, 'conversation')
+        if x['type'] == 'Meeting':
+            # assign the type for further processing as the object store might not be sufficient
+            x['record_type'] = 'meeting'
+            cleaned.append(x)
+        # Other types include Message, Chat, Space
+    return cleaned
 
-
-    for c in cleaned:
-        print(c)
 
 def parse_records(records):
     parsed_records = []
 
-    # messages = [d for d in records if d['store'] == 'messages']
-    # parse_text_message(messages)
+    # Parse the records based on the store they are in. Some records, such as meetings appear in multiple store.
+    # The most appropriate one was used in this case.
+
     # parse contacts
-    # contacts = [d for d in records if d['store'] == 'people']
-    # parse_contacts(contacts)
-    # parse text messages
+    contacts = [d for d in records if d['store'] == 'people']
+    parsed_records += parse_contacts(contacts)
+
+    # parse text messages, posts, call logs, file transfers
     reply_chains = [d for d in records if d['store'] == 'replychains']
-    parse_conversation(reply_chains)
-    # notifications = [d for d in records if d['store'] == 'notifications']
-    # calendarevents = [d for d in records if d['store'] == 'CalendarEvents']
-    # parse_calendar_events(calendarevents)
-    # replychains = [d for d in records if d['store'] == 'replychains']
-    # memberslru = [d for d in records if d['store'] == 'members_lru']
+    parsed_records += parse_reply_chain(reply_chains)
+
+    # parse meetings
+    conversations = [d for d in records if d['store'] == 'conversations']
+    parsed_records += parse_conversations(conversations)
+
+    return parsed_records
 
 
 def deduplicate(records, key):
     distinct_records = [i for n, i in enumerate(records) if
-                    i.get(key) not in [y.get(key) for y in
-                                                            records[n + 1:]]]
+                        i.get(key) not in [y.get(key) for y in
+                                           records[n + 1:]]]
     return distinct_records
 
 
@@ -145,11 +159,8 @@ def process_db(filepath, output_path):
     # parse records
     parsed_records = parse_records(extracted_values)
 
-    # deduplicate entries
-    # parsed_records = deduplicate(parsed_records)
-
     # write the output to a json file
-    # shared.write_results_to_json(parsed_records, output_path)
+    shared.write_results_to_json(parsed_records, output_path)
 
 
 @click.command()
