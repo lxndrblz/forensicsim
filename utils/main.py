@@ -114,6 +114,7 @@ def parse_conversations(conversations):
         x['origin_file'] = conversation['origin_file']
         if x['type'] == 'Meeting':
             # assign the type for further processing as the object store might not be sufficient
+            x['meeting'] = json.loads(x['meeting'])
             x['record_type'] = 'meeting'
             cleaned.append(x)
         # Other types include Message, Chat, Space

@@ -128,35 +128,6 @@ class ForensicIMIngestModule(DataSourceIngestModule):
 
         blackboard = Case.getCurrentCase().getServices().getBlackboard()
 
-        # Lets set up some custom attributes for the meetings
-        self.att_meeting_id = self.create_attribute_type('MST_MEETING_ID',
-                                                         BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.STRING,
-                                                         "Meeting ID", blackboard)
-        self.att_meeting_subject = self.create_attribute_type('MST_MEETING_SUBJECT',
-                                                              BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.STRING,
-                                                              "Meeting Subject", blackboard)
-        self.att_meeting_start = self.create_attribute_type('MST_MEETING_START',
-                                                            BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.DATETIME,
-                                                            "Meeting Start", blackboard)
-        self.att_meeting_end = self.create_attribute_type('MST_MEETING_END',
-                                                          BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.DATETIME,
-                                                          "Meeting End", blackboard)
-        self.att_meeting_organizer = self.create_attribute_type('MST_MEETING_ORGANIZER',
-                                                                BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.STRING,
-                                                                "Meeting Organizer", blackboard)
-        self.att_meeting_type = self.create_attribute_type('MST_MEETING_TYPE',
-                                                           BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.STRING,
-                                                           "Meeting Type", blackboard)
-        self.att_meeting_compose_time = self.create_attribute_type('MST_MEETING_COMPOSE_TIME',
-                                                                   BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.DATETIME,
-                                                                   "Compose Time", blackboard)
-        self.att_meeting_original_arrival_time = self.create_attribute_type('MST_MEETING_ORIGINAL_ARRIVAL_TIME',
-                                                                            BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.DATETIME,
-                                                                            "Original Arrival Time", blackboard)
-        self.att_meeting_client_arrival_time = self.create_attribute_type('MST_MEETING_CLIENT_ARRIVAL_TIME',
-                                                                          BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.DATETIME,
-                                                                          "Client Arrival Time", blackboard)
-
     def _parse_databases(self, content, progress_bar):
         # Create a temporary directory this directory will be used for temporarely storing the artefacts
         try:
@@ -352,14 +323,16 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                 url_attachments = ArrayList()
 
                 # process the attachments
-                if message['attachments'] is not None:
-                    for attachment in message['attachments']:
-                        # Attach files like links
-                        url_attachments.add(URLAttachment(attachment['objectUrl']))
+                if 'attachments' in message:
+                    if message['attachments'] is not None:
+                        for attachment in message['attachments']:
+                            # Attach files like links
+                            url_attachments.add(URLAttachment(attachment['objectUrl']))
                 # process links
-                if 'links' in message['properties']:
-                    for link in message['properties']['links']:
-                        url_attachments.add(URLAttachment(link['url']))
+                if 'properties' in message:
+                    if 'links' in message['properties']:
+                        for link in message['properties']['links']:
+                            url_attachments.add(URLAttachment(link['url']))
 
                 message_attachments = MessageAttachments(file_attachments, url_attachments)
                 helper.addAttachments(artifact, message_attachments)
@@ -381,11 +354,11 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                 art = database_file.newArtifact(BlackboardArtifact.ARTIFACT_TYPE.TSK_CALENDAR_ENTRY)
                 # Required Attributes
                 calendar_entry_type = "Meeting"
-                calendar_entry_start_time = self.date_to_long(meeting["threadProperties"]["startTime"])
-                calendar_entry_description = meeting["threadProperties"]["subject"]
+                calendar_entry_start_time = self.date_to_long(meeting["threadProperties"]['meeting']["startTime"])
+                calendar_entry_description = meeting["threadProperties"]['meeting']["subject"]
                 # Optional Attributes
-                calendar_entry_end_time = self.date_to_long(meeting["threadProperties"]["endTime"])
-                calendar_entry_organizer = meeting["threadProperties"]["organizerId"]
+                calendar_entry_end_time = self.date_to_long(meeting["threadProperties"]['meeting']["endTime"])
+                calendar_entry_organizer = meeting["threadProperties"]['meeting']["organizerId"]
 
                 art.addAttribute(
                     BlackboardAttribute(BlackboardAttribute.ATTRIBUTE_TYPE.TSK_CALENDAR_ENTRY_TYPE, ARTIFACT_PREFIX,
@@ -498,6 +471,9 @@ class ForensicIMIngestModule(DataSourceIngestModule):
         directories_to_process = len(all_ms_teams_leveldbs)
 
         self.log(Level.INFO, "Found {} Microsoft Teams directories to process.".format(directories_to_process))
+        message = IngestMessage.createMessage(IngestMessage.MessageType.DATA, ForensicIMIngestModuleFactory.moduleName,
+                                              "Found {} Microsoft Teams directories to process.".format(directories_to_process))
+        IngestServices.getInstance().postMessage(message)
 
         for i, content in enumerate(all_ms_teams_leveldbs):
             # Check if the user pressed cancel while we are processing the files
