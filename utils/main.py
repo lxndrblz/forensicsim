@@ -47,6 +47,7 @@ def parse_contacts(contacts):
     for contact in contacts:
         value = contact['value']
         x = extract_fields(value, 'contact')
+        x['file_origin'] = contact['file_origin']
         x['record_type'] = 'contact'
         cleaned.append(x)
 
@@ -58,13 +59,14 @@ def parse_contacts(contacts):
 
 def parse_reply_chain(reply_chains):
     cleaned = []
-    for conversation in reply_chains:
-        value = conversation['value']
+    for reply_chain in reply_chains:
+        value = reply_chain['value']
         message = value['messages']
         for key, value in message.items():
             # parse as a normal chat message
 
             x = extract_fields(value, 'message')
+            x['file_origin'] = reply_chain['file_origin']
             # Files send without any description will be of type text
             if x['messagetype'] == 'RichText/Html' or x['messagetype'] == 'Text':
                 # Get the call logs
@@ -102,6 +104,8 @@ def parse_conversations(conversations):
     for conversation in conversations:
         value = conversation['value']
         x = extract_fields(value, 'conversation')
+        # Include file origin for records
+        x['file_origin'] = conversation['file_origin']
         if x['type'] == 'Meeting':
             # assign the type for further processing as the object store might not be sufficient
             x['record_type'] = 'meeting'
