@@ -47,7 +47,7 @@ def parse_contacts(contacts):
     for contact in contacts:
         value = contact['value']
         x = extract_fields(value, 'contact')
-        x['file_origin'] = contact['file_origin']
+        x['origin_file'] = contact['origin_file']
         x['record_type'] = 'contact'
         cleaned.append(x)
 
@@ -66,7 +66,7 @@ def parse_reply_chain(reply_chains):
             # parse as a normal chat message
 
             x = extract_fields(value, 'message')
-            x['file_origin'] = reply_chain['file_origin']
+            x['origin_file'] = reply_chain['origin_file']
             # Files send without any description will be of type text
             if x['messagetype'] == 'RichText/Html' or x['messagetype'] == 'Text':
                 # Get the call logs
@@ -84,6 +84,12 @@ def parse_reply_chain(reply_chains):
                     # normal message, posts, file transfers
                     x['content'] = strip_html_tags(x['content'])
                     x['record_type'] = 'message'
+
+                    # handle string escaped json arrays within properties
+                    if 'links' in x['properties']:
+                        x['properties']['links'] = json.loads(x['properties']['links'])
+                    if 'files' in x['properties']:
+                        x['properties']['files'] = json.loads(x['properties']['files'])
                 # convert the timestamps
                 x['createdTime'] = convert_time_stamps(x['createdTime'])
                 x['version'] = convert_time_stamps(x['version'])
@@ -105,7 +111,7 @@ def parse_conversations(conversations):
         value = conversation['value']
         x = extract_fields(value, 'conversation')
         # Include file origin for records
-        x['file_origin'] = conversation['file_origin']
+        x['origin_file'] = conversation['origin_file']
         if x['type'] == 'Meeting':
             # assign the type for further processing as the object store might not be sufficient
             x['record_type'] = 'meeting'
@@ -155,10 +161,10 @@ def process_db(filepath, output_path):
         raise Exception('Given file path is not a folder. Path: {}'.format(filepath))
 
     # convert the database to a python list with nested dictionaries
-    # TODO Switch back once done
-    # extracted_values = shared.parse_db(filepath)
 
-    extracted_values = shared.parse_json()
+    extracted_values = shared.parse_db(filepath)
+
+    # extracted_values = shared.parse_json()
 
     # parse records
     parsed_records = parse_records(extracted_values)

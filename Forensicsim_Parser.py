@@ -67,6 +67,7 @@ from org.sleuthkit.datamodel.blackboardutils.CommunicationArtifactsHelper import
 from org.sleuthkit.datamodel.blackboardutils.attributes import MessageAttachments
 from org.sleuthkit.datamodel.blackboardutils.attributes.MessageAttachments import URLAttachment
 
+
 # Common Prefix Shared for all artefacts
 ARTIFACT_PREFIX = "Microsoft Teams"
 
@@ -329,10 +330,11 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                 message_date_time_edited = 0
                 message_date_time_deleted = 0
 
-                if message['edited'] is not None:
-                    message_date_time_edited = self.date_to_long(message['edited'])
-                if message['deleted'] is not None:
-                    message_date_time_deleted = self.date_to_long(message['deleted'])
+                if 'edittime' in message['properties']:
+                    message_date_time_edited = int(message['properties']['edittime'])
+                if 'deletetime' in message['properties']:
+                    message_date_time_edited = int(message['properties']['deletetime'])
+
                 additional_attributes = ArrayList()
                 additional_attributes.add(
                     BlackboardAttribute(BlackboardAttribute.ATTRIBUTE_TYPE.TSK_DATETIME_MODIFIED, ARTIFACT_PREFIX,
@@ -346,20 +348,21 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                                              message_read_status, subject, message_text, thread_id,
                                              additional_attributes)
 
-                # TODO refactor attachments
-                # file_attachments = ArrayList()
-                # url_attachments = ArrayList()
-                #
-                # if message['nested_content'] is not None:
-                #     for schema in message['nested_content']:
-                #         for nc in schema:
-                #             # Attach files like links, but need to get a different property
-                #             if nc['@type'] == "http://schema.skype.com/File":
-                #                 url_attachments.add(URLAttachment(nc['objectUrl']))
-                #             if nc['@type'] == "http://schema.skype.com/HyperLink":
-                #                 url_attachments.add(URLAttachment(nc['url']))
-                # message_attachments = MessageAttachments(file_attachments, url_attachments)
-                # helper.addAttachments(artifact, message_attachments)
+                file_attachments = ArrayList()
+                url_attachments = ArrayList()
+
+                # process the attachments
+                if message['attachments'] is not None:
+                    for attachment in message['attachments']:
+                        # Attach files like links
+                        url_attachments.add(URLAttachment(attachment['objectUrl']))
+                # process links
+                if 'links' in message['properties']:
+                    for link in message['properties']['links']:
+                        url_attachments.add(URLAttachment(link['url']))
+
+                message_attachments = MessageAttachments(file_attachments, url_attachments)
+                helper.addAttachments(artifact, message_attachments)
 
         except TskCoreException as ex:
             # Severe error trying to add to case database.. case is not complete.

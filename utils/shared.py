@@ -2,7 +2,6 @@ import json
 
 from ccl_chrome_indexeddb import ccl_chromium_indexeddb
 
-
 def write_results_to_json(data, outputpath):
     # Dump messages into a json file
     try:
