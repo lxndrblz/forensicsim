@@ -186,7 +186,7 @@ def parse_cmdline():
     parser = argparse.ArgumentParser(description=description)
     required_group = parser.add_argument_group('required arguments')
     required_group.add_argument('--filepath', required=True, help='File path to the IndexedDB.')
-    required_group.add_argument('--outputpath', required=True, help='File path to the procesed output.')
+    required_group.add_argument('--outputpath', required=True, help='File path to the processed output.')
     args = parser.parse_args()
     return args
 
