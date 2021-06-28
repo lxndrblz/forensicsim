@@ -20,20 +20,20 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-import sys
-import struct
+import dataclasses
+import datetime
+import enum
+import io
 import os
 import pathlib
-import io
-import enum
-import datetime
-import dataclasses
+import struct
+import sys
 import types
 import typing
 
+from . import ccl_blink_value_deserializer
 from . import ccl_leveldb
 from . import ccl_v8_value_deserializer
-from . import ccl_blink_value_deserializer
 
 __version__ = "0.6"
 __description__ = "Module for reading Chromium IndexedDB LevelDB databases."
@@ -75,6 +75,10 @@ def read_le_varint(stream: typing.BinaryIO, *, is_google_32bit=False):
 def _le_varint_from_bytes(data: bytes):
     with io.BytesIO(data) as buff:
         return _read_le_varint(buff)
+
+
+def custom_le_varint_from_bytes(data: bytes):
+    return _le_varint_from_bytes(data)
 
 
 def le_varint_from_bytes(data: bytes):
@@ -512,7 +516,7 @@ class IndexedDb:
 
 
 class WrappedObjectStore:
-    def __init__(self, raw_db: IndexedDb,  dbid_no: int, obj_store_id: int):
+    def __init__(self, raw_db: IndexedDb, dbid_no: int, obj_store_id: int):
         self._raw_db = raw_db
         self._dbid_no = dbid_no
         self._obj_store_id = obj_store_id
@@ -557,7 +561,7 @@ class WrappedObjectStore:
 
 
 class WrappedDatabase:
-    def __init__(self, raw_db: IndexedDb,  dbid: DatabaseId):
+    def __init__(self, raw_db: IndexedDb, dbid: DatabaseId):
         self._raw_db = raw_db
         self._dbid = dbid
 
@@ -664,7 +668,8 @@ class WrappedIndexDB:
         elif isinstance(item, int):
             return item in self._db_number_lookup
         else:
-            raise TypeError("keys must be provided as a tuple of (name, origin) or a str (if only single origin) or int")
+            raise TypeError(
+                "keys must be provided as a tuple of (name, origin) or a str (if only single origin) or int")
 
     def __getitem__(self, item: typing.Union[int, str, typing.Tuple[str, str]]) -> WrappedDatabase:
         if isinstance(item, int):
@@ -693,4 +698,3 @@ class WrappedIndexDB:
 
     def __repr__(self):
         return f"<WrappedIndexDB: {self._raw_db.database_path}>"
-
