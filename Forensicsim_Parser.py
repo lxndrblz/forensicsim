@@ -265,12 +265,12 @@ class ForensicIMIngestModule(DataSourceIngestModule):
         # each call log artifact
         try:
             for call in calls:
-                call_direction = self.deduce_call_direction(call['call-log']['callDirection'])
-                from_address = call['call-log']['originator']
-                to_address = call['call-log']['target']
-                start_date = self.date_to_long(call['call-log']['startTime'])
-                end_date = self.date_to_long(call['call-log']['endTime'])
-                # TODO implement call state, such as missed/accepted
+                call_direction = self.deduce_call_direction(call['properties']['call-log']['callDirection'])
+                from_address = call['properties']['call-log']['originator']
+                to_address = call['properties']['call-log']['target']
+                start_date = self.date_to_long(call['properties']['call-log']['startTime'])
+                end_date = self.date_to_long(call['properties']['call-log']['endTime'])
+
                 helper.addCalllog(call_direction, from_address, to_address, start_date, end_date, CallMediaType.UNKNOWN)
         except TskCoreException as ex:
             # These exceptions are thrown by the CommunicationArtifactsHelper.

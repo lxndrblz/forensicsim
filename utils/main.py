@@ -73,16 +73,15 @@ def parse_reply_chain(reply_chains):
                 # Get the call logs
                 if 'call-log' in x['properties']:
                     # call logs are string escaped
-                    call_log = json.loads(value['properties']['call-log'])
-                    x['call-log'] = call_log
+                    x['properties']['call-log'] = json.loads(value['properties']['call-log'])
                     x['record_type'] = 'call'
                 # Get the reactions from the chat
-                if 'activity' in x['properties']:
+                elif 'activity' in x['properties']:
                     # reactionInChat are for personal conversations, reactions are for posts or comments
                     if x['properties']['activity']['activityType'] == 'reactionInChat' or 'reaction':
                         x['record_type'] = 'reaction'
+                # normal message, posts, file transfers
                 else:
-                    # normal message, posts, file transfers
                     x['content'] = strip_html_tags(x['content'])
                     x['record_type'] = 'message'
 
