@@ -1,0 +1,14 @@
+2021/06/01-10:12:06.695 17ec Reusing MANIFEST C:\Users\forensics\AppData\Roaming\Microsoft\Teams\IndexedDB\https_teams.microsoft.com_0.indexeddb.leveldb/MANIFEST-000001
+2021/06/01-10:12:06.697 17ec Recovering log #74
+2021/06/01-10:12:06.721 17ec Reusing old log C:\Users\forensics\AppData\Roaming\Microsoft\Teams\IndexedDB\https_teams.microsoft.com_0.indexeddb.leveldb/000074.log 
+2021/06/01-10:46:52.270 70 Level-0 table #81: started
+2021/06/01-10:46:52.297 70 Level-0 table #81: 1637675 bytes OK
+2021/06/01-10:46:52.299 70 Delete type=0 #74
+2021/06/01-10:50:49.190 70 Compacting 1@1 + 2@2 files
+2021/06/01-10:50:49.245 70 Generated table #82@1: 6659 keys, 2163971 bytes
+2021/06/01-10:50:49.315 70 Generated table #83@1: 5444 keys, 1387104 bytes
+2021/06/01-10:50:49.315 70 Compacted 1@1 + 2@2 files => 3551075 bytes
+2021/06/01-10:50:49.317 70 compacted to: files[ 0 0 2 0 0 0 0 ]
+2021/06/01-10:50:49.318 70 Delete type=2 #77
+2021/06/01-10:50:49.318 70 Delete type=2 #78
+2021/06/01-10:50:49.318 70 Delete type=2 #81
