@@ -59,6 +59,7 @@ from org.sleuthkit.datamodel import BlackboardArtifact
 from org.sleuthkit.datamodel import BlackboardAttribute
 from org.sleuthkit.datamodel import CommunicationsManager
 from org.sleuthkit.datamodel import TskCoreException
+from org.sleuthkit.datamodel import TskData
 from org.sleuthkit.datamodel.Blackboard import BlackboardException
 from org.sleuthkit.datamodel.blackboardutils import CommunicationArtifactsHelper
 from org.sleuthkit.datamodel.blackboardutils.CommunicationArtifactsHelper import CallMediaType
@@ -179,6 +180,10 @@ class ForensicIMIngestModule(DataSourceIngestModule):
             children = content.getChildren()
             for child in children:
                 child_name = child.getName()
+                # Skip any unallocated files
+                if child.isMetaFlagSet(TskData.TSK_FS_META_FLAG_ENUM.UNALLOC) or child.isDirNameFlagSet(
+                        TskData.TSK_FS_NAME_FLAG_ENUM.UNALLOC):
+                    continue
                 child_path = os.path.join(path, child_name)
                 # ignore relative paths
                 if child_name == "." or child_name == "..":
@@ -537,9 +542,8 @@ class ForensicIMIngestModule(DataSourceIngestModule):
 
         file_manager = Case.getCurrentCase().getServices().getFileManager()
         directory = "https_teams.microsoft.com_0.indexeddb.leveldb"
-        # AppData/Roaming/Microsoft/Teams/IndexedDB
-        parent_directory = "IndexedDB"
-        all_ms_teams_leveldbs = file_manager.findFiles(data_source, directory, parent_directory)
+
+        all_ms_teams_leveldbs = file_manager.findFiles(data_source, directory)
 
         # Loop over all the files. On a multi user account these could be multiple one.
         directories_to_process = len(all_ms_teams_leveldbs)
