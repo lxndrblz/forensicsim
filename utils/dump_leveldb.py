@@ -32,8 +32,8 @@ def parse_cmdline():
     description = 'Forensics.im Dump Tool'
     parser = argparse.ArgumentParser(description=description)
     required_group = parser.add_argument_group('required arguments')
-    required_group.add_argument('--filepath', required=True, help='File path to the IndexedDB.')
-    required_group.add_argument('--outputpath', required=True, help='File path to the processed output.')
+    required_group.add_argument('-f', '--filepath', required=True, help='File path to the IndexedDB.')
+    required_group.add_argument('-o', '--outputpath', required=True, help='File path to the processed output.')
     args = parser.parse_args()
     return args
 

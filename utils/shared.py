@@ -4,7 +4,7 @@ import json
 from ccl_chrome_indexeddb import ccl_blink_value_deserializer, ccl_chromium_indexeddb, ccl_v8_value_deserializer, \
     ccl_leveldb
 
-# db ID (second byte) is constant, store ids vary based on what we are looking for
+# db ID (second byte) is constant for the version analysed, store ids vary based on what we are looking for.
 TEAMS_DB_PREFIX = {'replychains': b'\x00\x05\x02\x01', 'conversations': b'\x00\x05\x04\x01',
                    'people': b'\x00\x05\x07\x01'}
 
@@ -12,6 +12,8 @@ TEAMS_DB_PREFIX = {'replychains': b'\x00\x05\x02\x01', 'conversations': b'\x00\x
 def deserialize(db):
     # Deserializer is adopted from but uses constant database and object stores IDs rather than looping through the dbs forever.
     # https://github.com/cclgroupltd/ccl_chrome_indexeddb/blob/master/ccl_chromium_indexeddb.py
+
+    # TODO refactor code to a subclass of RawLevelDB and override the iterator functionality
 
     blink_deserializer = ccl_blink_value_deserializer.BlinkV8Deserializer()
 
@@ -36,11 +38,15 @@ def deserialize(db):
 
                 val_idx += len(varint_raw)
 
+                # read the raw value of the record.
                 obj_raw = io.BytesIO(record.value[val_idx:])
+
+                # Initialize deserializer and try deserialization.
                 deserializer = ccl_v8_value_deserializer.Deserializer(
                     obj_raw, host_object_delegate=blink_deserializer.read)
                 try:
                     value = deserializer.read()
+                    # TODO refactor code to a generator.
                     deserialized_db.append({'value': value, 'origin_file': record.origin_file, 'store': datastore})
                 except Exception as e:
                     pass
@@ -57,12 +63,14 @@ def write_results_to_json(data, outputpath):
 
 
 def parse_db(filepath):
+    # Open raw access to a LevelDB and deserialize the records.
     db = ccl_leveldb.RawLevelDb(filepath)
     extracted_values = deserialize(db)
     return extracted_values
 
 
 def parse_json():
+    # read data from a file. This is only for testing purpose.
     try:
         with open('teams.json') as json_file:
             data = json.load(json_file)
