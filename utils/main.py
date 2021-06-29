@@ -28,6 +28,7 @@ from datetime import datetime
 from pathlib import Path
 
 import pyfiglet
+import pyfiglet.fonts
 from bs4 import BeautifulSoup
 
 import shared

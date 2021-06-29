@@ -120,7 +120,7 @@ class ForensicIMIngestModule(DataSourceIngestModule):
     def startUp(self, context):
         self.context = context
         if PlatformUtil.isWindowsOS():
-            self.path_to_executable = os.path.join(os.path.dirname(os.path.abspath(__file__)), "main.exe")
+            self.path_to_executable = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ms_teams_parser.exe")
             if not os.path.exists(self.path_to_executable):
                 raise IngestModuleException("Could not find main.exe within the module directory.")
         else:

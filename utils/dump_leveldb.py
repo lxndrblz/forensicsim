@@ -26,6 +26,7 @@ from pathlib import Path
 
 import argparse
 import pyfiglet
+import pyfiglet.fonts
 
 import shared
 
