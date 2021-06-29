@@ -409,7 +409,7 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                             # Add one reaction entry by per
                             for user in emotion['users']:
                                 self.parse_reaction(message_id, thread_id, user["mri"], phone_number_from, message_text,
-                                                    emotion['key'], int(user['time']), teams_leveldb_file_path)
+                                                    emotion['key'], int(user['time']/1000), teams_leveldb_file_path)
 
                 message_attachments = MessageAttachments(file_attachments, url_attachments)
                 helper.addAttachments(artifact, message_attachments)
