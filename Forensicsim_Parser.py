@@ -67,7 +67,6 @@ from org.sleuthkit.datamodel.blackboardutils.CommunicationArtifactsHelper import
 from org.sleuthkit.datamodel.blackboardutils.attributes import MessageAttachments
 from org.sleuthkit.datamodel.blackboardutils.attributes.MessageAttachments import URLAttachment
 
-
 # Common Prefix Shared for all artefacts
 ARTIFACT_PREFIX = "Microsoft Teams"
 
@@ -128,8 +127,32 @@ class ForensicIMIngestModule(DataSourceIngestModule):
 
         blackboard = Case.getCurrentCase().getServices().getBlackboard()
 
+        # reaction attributes
+
+        self.att_reaction_message_id = self.create_attribute_type('MST_MESSAGE_ID',
+                                                                  BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.STRING,
+                                                                  "Message ID", blackboard)
+        self.att_reaction_thread_id = self.create_attribute_type('MST_THREAD_ID',
+                                                                 BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.STRING,
+                                                                 "Thread ID", blackboard)
+        self.att_reaction_source_user_id = self.create_attribute_type('MST_SOURCE_USER_ID',
+                                                                      BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.STRING,
+                                                                      "Source User", blackboard)
+        self.att_reaction_target_user_id = self.create_attribute_type('MST_TARGET_USER_ID',
+                                                                      BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.STRING,
+                                                                      "Target User", blackboard)
+        self.att_reaction_message_preview = self.create_attribute_type('MST_MESSAGE_PREVIEW',
+                                                                       BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.STRING,
+                                                                       "Preview", blackboard)
+        self.att_reaction_activity = self.create_attribute_type('MST_ACTIVITY_SUBTYPE',
+                                                                BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.STRING,
+                                                                "Activity", blackboard)
+        self.att_reaction_timestamp = self.create_attribute_type('MST_TIMESTAMP',
+                                                                 BlackboardAttribute.TSK_BLACKBOARD_ATTRIBUTE_VALUE_TYPE.DATETIME,
+                                                                 "Timestamp", blackboard)
+
     def _parse_databases(self, content, progress_bar):
-        # Create a temporary directory this directory will be used for temporarely storing the artefacts
+        # Create a temporary directory this directory will be used for temporarily storing the artefacts
         try:
 
             parent_path = content.getParentPath()
@@ -229,14 +252,55 @@ class ForensicIMIngestModule(DataSourceIngestModule):
 
                 # messages
                 messages = [d for d in records if d['record_type'] == 'message']
-                self.parse_messages(messages, helper)
+                self.parse_messages(messages, helper, teams_leveldb_file_path)
 
                 # meetings does not have a convenient helper so we pass the file
                 meetings = [d for d in records if d['record_type'] == 'meeting']
                 self.parse_meetings(meetings, teams_leveldb_file_path)
 
+
         except NoCurrentCaseException as ex:
             self._logger.log(Level.WARNING, "No case currently open.", ex)
+
+    def parse_reaction(self, message_id, thread_id, source_user, target_user, message_preview, activity, timestamp,
+                       database_file):
+        blackboard = Case.getCurrentCase().getServices().getBlackboard()
+        try:
+            self.art_meeting = self.create_artifact_type("MST_REACTION", "Reactions", blackboard)
+
+            art = database_file.newArtifact(self.art_meeting.getTypeID())
+            # Add the subject as a test attribute to the artefact
+            art.addAttribute(BlackboardAttribute(self.att_reaction_message_id, ForensicIMIngestModuleFactory.moduleName,
+                                                 message_id))
+
+            art.addAttribute(
+                BlackboardAttribute(self.att_reaction_thread_id, ForensicIMIngestModuleFactory.moduleName,
+                                    thread_id))
+            art.addAttribute(
+                BlackboardAttribute(self.att_reaction_source_user_id, ForensicIMIngestModuleFactory.moduleName,
+                                    source_user))
+            art.addAttribute(
+                BlackboardAttribute(self.att_reaction_target_user_id, ForensicIMIngestModuleFactory.moduleName,
+                                    target_user))
+            art.addAttribute(
+                BlackboardAttribute(self.att_reaction_message_preview, ForensicIMIngestModuleFactory.moduleName,
+                                    message_preview))
+            art.addAttribute(
+                BlackboardAttribute(self.att_reaction_activity, ForensicIMIngestModuleFactory.moduleName,
+                                    activity))
+            art.addAttribute(
+                BlackboardAttribute(self.att_reaction_timestamp, ForensicIMIngestModuleFactory.moduleName,
+                                    timestamp))
+            self.index_artifact(art)
+        except TskCoreException as ex:
+            # Severe error trying to add to case database.. case is not complete.
+            # These exceptions are thrown by the CommunicationArtifactsHelper.
+            self._logger.log(Level.SEVERE,
+                             "Failed to add message artifacts to the case database.", ex)
+        except BlackboardException as ex:
+            # Failed to post notification to blackboard
+            self._logger.log(Level.WARNING,
+                             "Failed to post message artifact to the blackboard", ex)
 
     def parse_contacts(self, contacts, helper):
         # Todo possibly write a owner parser overriding the TskContactsParser, problem is that it expects a resultset
@@ -281,12 +345,13 @@ class ForensicIMIngestModule(DataSourceIngestModule):
             self._logger.log(Level.WARNING,
                              "Failed to post call log artifact to the blackboard", ex)
 
-    def parse_messages(self, messages, helper):
+    def parse_messages(self, messages, helper, teams_leveldb_file_path):
         # Query for messages and iterate row by row adding
         # each message artifact
         try:
             for message in messages:
                 message_type = ARTIFACT_PREFIX
+                message_id = message["clientmessageid"]
                 direction = self.deduce_message_direction(message["isFromMe"])
                 phone_number_from = message["creator"]
                 # TODO Fix To Number
@@ -308,11 +373,11 @@ class ForensicIMIngestModule(DataSourceIngestModule):
 
                 additional_attributes = ArrayList()
                 additional_attributes.add(
-                    BlackboardAttribute(BlackboardAttribute.ATTRIBUTE_TYPE.TSK_DATETIME_MODIFIED, ARTIFACT_PREFIX,
-                                        message_date_time_edited))
-                additional_attributes.add(
-                    BlackboardAttribute(BlackboardAttribute.ATTRIBUTE_TYPE.TSK_DATETIME_DELETED, ARTIFACT_PREFIX,
-                                        message_date_time_deleted))
+                    BlackboardAttribute(BlackboardAttribute.ATTRIBUTE_TYPE.TSK_ID, ARTIFACT_PREFIX,
+                                        message_id))
+                # additional_attributes.add(
+                #     BlackboardAttribute(BlackboardAttribute.ATTRIBUTE_TYPE.TSK_DATETIME_DELETED, ARTIFACT_PREFIX,
+                #                         message_date_time_deleted))
 
                 artifact = helper.addMessage(message_type, direction, phone_number_from, phone_number_to,
                                              message_date_time,
@@ -333,9 +398,18 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                     if 'links' in message['properties']:
                         for link in message['properties']['links']:
                             url_attachments.add(URLAttachment(link['url']))
+                    if 'emotions' in message['properties']:
+                        for emotion in message['properties']['emotions']:
+                            # emotions are grouped by their key like, heart..
+                            # Add one reaction entry by per
+                            for user in emotion['users']:
+                                self.parse_reaction(message_id, thread_id, user["mri"], phone_number_from, message_text,
+                                                    emotion['key'], int(user['time']), teams_leveldb_file_path)
 
                 message_attachments = MessageAttachments(file_attachments, url_attachments)
                 helper.addAttachments(artifact, message_attachments)
+
+
 
         except TskCoreException as ex:
             # Severe error trying to add to case database.. case is not complete.
@@ -441,7 +515,7 @@ class ForensicIMIngestModule(DataSourceIngestModule):
 
     def create_artifact_type(self, artifact_name, artifact_description, blackboard):
         try:
-            artifact = blackboard.getOrAddArtifactType(artifact_name, ARTIFACT_PREFIX + artifact_description)
+            artifact = blackboard.getOrAddArtifactType(artifact_name, ARTIFACT_PREFIX + " " + artifact_description)
         except Exception as e:
             self.log(Level.INFO, "Error getting or adding artifact type: {} {}".format(artifact_description, str(e)))
         return artifact

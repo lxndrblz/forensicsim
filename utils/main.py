@@ -106,7 +106,7 @@ def parse_reply_chain(reply_chains):
                     # Get the reactions from the chat
                     elif 'activity' in x['properties']:
                         # reactionInChat are for personal conversations, reactions are for posts or comments
-                        if x['properties']['activity']['activityType'] == 'reactionInChat' or 'reaction':
+                        if x['properties']['activity']['activityType'] == 'reactionInChat' or x['properties']['activity']['activityType'] == 'reaction':
                             x['record_type'] = 'reaction'
                     # normal message, posts, file transfers
                     else:
@@ -126,9 +126,9 @@ def parse_reply_chain(reply_chains):
                     # They are composed of the:
                     # -> creator 8:orgid:54dd27a7-fbb0-4bf0-8208-a4b31a578a3f
                     # -> clientmessageid 6691174965251523000
-                    if x['creator'] is not None and x['clientmessageid'] is not None:
+                    if x['creator'] is not None and x['clientmessageid'] is not None and 'record_type' in x:
                         x['cachedDeduplicationKey'] = str(x['creator'] + x['clientmessageid'])
-                    cleaned.append(x)
+                        cleaned.append(x)
                 # Other types include ThreadActivity/TopicUpdate and ThreadActivity/AddMember
                 # -> ThreadActivity/TopicUpdate occurs for meeting updates
                 # -> ThreadActivity/AddMember occurs when someone gets added to a chat
@@ -152,14 +152,14 @@ def parse_conversations(conversations):
             if 'lastMessage' in conversation['value']:
                 if 'cachedDeduplicationKey' in conversation['value']['lastMessage']:
                     x['cachedDeduplicationKey'] = conversation['value']['lastMessage']['cachedDeduplicationKey']
-                # we are only interested in meetings for now
-                if x['type'] == 'Meeting':
-                    # assign the type for further processing as the object store might not be sufficient
-                    if 'threadProperties' in x:
-                        if 'meeting' in x['threadProperties']:
-                            x['threadProperties']['meeting'] = json.loads(x['threadProperties']['meeting'])
-                            x['record_type'] = 'meeting'
-                            cleaned.append(x)
+                    # we are only interested in meetings for now
+                    if x['type'] == 'Meeting':
+                        # assign the type for further processing as the object store might not be sufficient
+                        if 'threadProperties' in x:
+                            if 'meeting' in x['threadProperties']:
+                                x['threadProperties']['meeting'] = json.loads(x['threadProperties']['meeting'])
+                                x['record_type'] = 'meeting'
+                                cleaned.append(x)
         except UnicodeDecodeError or KeyError:
             print("Could not decode meeting.")
             print(conversation)
