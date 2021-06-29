@@ -14,6 +14,7 @@ This plugin is an artefact of the Master Thesis *Digital Forensic Acquisition an
 ---
 # Quickstart
 ## Standalone Parser Usage
+
 The standalone parser script writes all the processed and identified records into a structured JSON file, which can either be processed by the Autopsy Plugin or in another application.
 
 The main parser script can be used like this:
@@ -52,25 +53,34 @@ required arguments:
 ```
 ---
 # Development
-## Compiling the utils\main.py to an Executable which can be interfaced by the Autopsy Wrapper or used in a standalone mode:
+
+## Compiling the utils\main.py to an Executable:
+
 ```bash
 pyinstaller "main.spec"
 ```
-
-## Used Python Modules
-This script uses the [ccl_chrome_indexeddb](https://github.com/cclgroupltd/ccl_chrome_indexeddb) Python module for enumerating the *LevelDB* artefacts without external dependencies.
 ---
 
 # Utility Scripts for populating Microsoft Skype and Microsoft Teams
+
 ## populate_skype.py
+
 A wee script for populating *Skype for Desktop* in a lab environment.
 The script can be used like this:
+
 ```
 utils\populate_skype.py -a 0 -f conversation.json
 ```
 ## populate_teams.py
+
 A wee script for populating *Microsoft Teams* in a lab environment.
 The script can be used like this:
+
 ```
 utils\populate_teams.py -a 0 -f conversation.json
 ```
+
+## Acknowledgements & Thanks
+ - [ccl_chrome_indexeddb](https://github.com/cclgroupltd/ccl_chrome_indexeddb) Python module for enumerating the *LevelDB* artefacts without external dependencies.
+ - [Gutenberg Project](https://www.gutenberg.org/files/1661/1661-0.txt) Part of Arthur Conan Doyle's book *The Adventures of Sherlock Holmes* have been used for creating a natural conversation between the two demo accounts. 
+
