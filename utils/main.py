@@ -1,10 +1,33 @@
+"""
+MIT License
+
+Copyright (c) 2021 Alexander Bilz
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+"""
+
+import argparse
 import json
 from datetime import datetime
 from pathlib import Path
 
 import pyfiglet
-import argparse
-
 from bs4 import BeautifulSoup
 
 import shared
@@ -103,7 +126,7 @@ def parse_reply_chain(reply_chains):
                     # -> creator 8:orgid:54dd27a7-fbb0-4bf0-8208-a4b31a578a3f
                     # -> clientmessageid 6691174965251523000
                     if x['creator'] is not None and x['clientmessageid'] is not None:
-                        x['cachedDeduplicationKey'] = str(x['creator']+x['clientmessageid'])
+                        x['cachedDeduplicationKey'] = str(x['creator'] + x['clientmessageid'])
                     cleaned.append(x)
                 # Other types include ThreadActivity/TopicUpdate and ThreadActivity/AddMember
                 # -> ThreadActivity/TopicUpdate occurs for meeting updates
@@ -190,16 +213,16 @@ def process_db(filepath, output_path):
 
     extracted_values = shared.parse_db(filepath)
 
-    # extracted_values = shared.parse_json()
-
     # parse records
     parsed_records = parse_records(extracted_values)
 
     # write the output to a json file
     shared.write_results_to_json(parsed_records, output_path)
 
+
 def run(args):
     process_db(args.filepath, args.outputpath)
+
 
 def parse_cmdline():
     description = 'Forensics.im Xtract Tool'
@@ -209,6 +232,7 @@ def parse_cmdline():
     required_group.add_argument('-o', '--outputpath', required=True, help='File path to the processed output.')
     args = parser.parse_args()
     return args
+
 
 def cli():
     header = pyfiglet.figlet_format("Forensics.im Xtract Tool")
