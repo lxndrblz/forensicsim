@@ -92,6 +92,12 @@ def parse_db(filepath):
     extracted_values = deserialize(db)
     return extracted_values
 
+def parse_db_raw(filepath):
+    db = ccl_leveldb.RawLevelDb(filepath)
+    extracted_values = []
+    for record in db.iterate_records_raw():
+        extracted_values.append(record)
+    return extracted_values
 
 def parse_json():
     # read data from a file. This is only for testing purpose.
