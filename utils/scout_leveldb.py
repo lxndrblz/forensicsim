@@ -29,17 +29,25 @@ import wx
 import shared
 
 
+class DataRecord:
+    def __init__(self, key, value, store):
+        self.key = key
+        self.value = value
+        self.store = store
+
+
 class DetailView(wx.Dialog):
     def __init__(self, db_record):
         title = "Detail View"
         super().__init__(parent=None, title=title)
         self.main_sizer = wx.BoxSizer(wx.VERTICAL)
         self.logs = wx.TextCtrl(self, id=-1, value='', pos=wx.DefaultPosition,
-                                size=(-1,300),
-                                style= wx.TE_MULTILINE | wx.SUNKEN_BORDER)
-        self.logs.AppendText(db_record.value.decode('utf-8', errors='replace') + "\n")
+                                size=(-1, 300),
+                                style=wx.TE_MULTILINE | wx.SUNKEN_BORDER)
+        self.logs.AppendText(db_record.value + "\n")
         self.main_sizer.Add(self.logs, 0, wx.ALL | wx.EXPAND, 5)
         self.SetSizer(self.main_sizer)
+
 
 class DBScoutPanel(wx.Panel):
     def __init__(self, parent):
@@ -84,12 +92,11 @@ class DBScoutPanel(wx.Panel):
         self.list_ctrl.InsertColumn(2, 'Origin', width=140)
 
     def insert_list_item(self, i, extracted_value):
-        self.list_ctrl.InsertItem(i,
-                                  str(extracted_value.key))
+        self.list_ctrl.InsertItem(i, extracted_value.key)
         self.list_ctrl.SetItem(i, 1,
-                               extracted_value.value.decode('utf-8', errors='replace'))
+                               extracted_value.value)
         self.list_ctrl.SetItem(i, 2,
-                               str(extracted_value.origin_file))
+                               extracted_value.store)
 
     def OnSearchCancel(self, evt):
         self.leveldb = self.leveldb_unfiltered
@@ -98,12 +105,11 @@ class DBScoutPanel(wx.Panel):
 
     def OnSearch(self, evt):
         value = self.search.GetValue()
-        value_bytes = str.encode(value)
         self.setup_list_ctr()
         i = 0
         updated_list = []
         for extracted_value in self.leveldb:
-            if value_bytes in extracted_value.value:
+            if str(value) in extracted_value.value:
                 updated_list.append(extracted_value)
                 self.insert_list_item(i, extracted_value)
                 i += 1
@@ -128,10 +134,18 @@ class DBScoutPanel(wx.Panel):
             raise Exception('Given file path is not a folder. Path: {}'.format(filepath))
 
         # convert the database to a python list with nested dictionaries
-        extracted_values = shared.parse_db_raw(filepath)
-        self.leveldb = extracted_values
-        self.leveldb_unfiltered = extracted_values
-        for i, extracted_value in enumerate(extracted_values):
+        extracted_records = shared.parse_db(filepath)
+        processed_records = []
+        for record in extracted_records:
+            try:
+                processed_records.append(
+                    DataRecord(str(record['key']), str(record['value']), str(record['origin_file'])))
+            except UnicodeDecodeError:
+                continue
+
+        self.leveldb = processed_records
+        self.leveldb_unfiltered = processed_records
+        for i, extracted_value in enumerate(processed_records):
             self.insert_list_item(i, extracted_value)
 
 
