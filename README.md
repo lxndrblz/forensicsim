@@ -85,10 +85,6 @@ basic manner. This script can come in handy, if you are trying to see if a certa
 to perform some manual data analysis. To open a database within the GUI, simply click on File -> Open LevelDB. Loading
 the database can take a seconds, so please be patient, as there is currently no progress bar implemented.
 
-Please note that the entries displayed in this application are currently not decoded, which might result in some
-unexpected characters occuring in the output. The output of this script should, therefore, be treated as a preview for
-the records that are available within the database.
-
 ![Autopsy Module](img/leveldb_scout.PNG)
 
 You can run the script like this:

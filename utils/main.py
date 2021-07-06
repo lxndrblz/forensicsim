@@ -78,7 +78,6 @@ def parse_contacts(contacts):
             cleaned.append(x)
         except UnicodeDecodeError or KeyError:
             print("Could not decode contact.")
-            print(contact)
 
     # Deduplicate based on mri - should be unique anyway
     cleaned = deduplicate(cleaned, 'mri')
@@ -132,9 +131,9 @@ def parse_reply_chain(reply_chains):
                 # Other types include ThreadActivity/TopicUpdate and ThreadActivity/AddMember
                 # -> ThreadActivity/TopicUpdate occurs for meeting updates
                 # -> ThreadActivity/AddMember occurs when someone gets added to a chat
-            except UnicodeDecodeError or KeyError:
+            except UnicodeDecodeError or KeyError as e:
                 print("Could not decode reply chain.")
-                print(reply_chain)
+
     # Deduplicate based on cachedDeduplicationKey, as messages appear often multiple times within
     cleaned = deduplicate(cleaned, 'cachedDeduplicationKey')
     return cleaned
@@ -149,8 +148,8 @@ def parse_conversations(conversations):
             # Include file origin for records
             x['origin_file'] = conversation['origin_file']
             # Make first at sure that the conversation has a cachedDeduplicationKey
-            if 'lastMessage' in conversation['value']:
-                if 'cachedDeduplicationKey' in conversation['value']['lastMessage']:
+            if conversation['value'].get('lastMessage') is not None:
+                if conversation['value']['lastMessage'].get('cachedDeduplicationKey') is not None:
                     x['cachedDeduplicationKey'] = conversation['value']['lastMessage']['cachedDeduplicationKey']
                     # we are only interested in meetings for now
                     if x['type'] == 'Meeting':
@@ -162,7 +161,6 @@ def parse_conversations(conversations):
                                 cleaned.append(x)
         except UnicodeDecodeError or KeyError:
             print("Could not decode meeting.")
-            print(conversation)
         # Other types include Message, Chat, Space, however, these did not include any records of evidential value
         # for my test data. It might be relevant to investigate these further with a different test scenario.
 
