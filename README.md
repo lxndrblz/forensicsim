@@ -22,6 +22,22 @@ Electron-based Communication Platforms* at the University of Abertay, Dundee, Un
 
 # Quickstart
 
+## Autopsy Module Installation
+This module requires the installation of Autopsy v4.18 or above and a *Windows*-based system.
+
+To install the *Microsoft Teams* parser for *Autopsy*, please follow these steps:
+* Download the `.zip` folder and the `.exe` file of the latest available [release](https://github.com/lxndrblz/forensicsim/releases).
+* Extract the `.zip` folder onto your computer.
+* Open the Windows File Explorer and navigate to your *Autopsy* Python plugin directory. By default, it is located under `%AppData%\autopsy\python_modules`.
+* Create a new `forensicsim` folder within the `python_modules` folder.
+* Copy the `ms_teams_parser.exe` and the `Forensicsim_Parser.py` to the `forensicsim` directory.
+* Restart *Autopsy* to activate the module.
+
+You can test verify that the module has installed successfully by performing the following steps:
+* Start Autopsy.
+* Open/Create a case and add a source.
+* You will find the added modules under the menu Tools-> Run Ingest Modules -> Name of the Data Source.
+
 ## Standalone Parser Usage
 
 The standalone parser script writes all the processed and identified records into a structured JSON file, which can
