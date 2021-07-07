@@ -25,7 +25,7 @@ import typing
 import dataclasses
 from types import MappingProxyType
 
-import ccl_leveldb
+from . import ccl_leveldb
 
 __version__ = "0.1"
 __description__ = "Module for reading the Chromium leveldb sessionstorage format"
@@ -212,7 +212,6 @@ def main(args):
     print("Hosts in db:")
     for host in ssdb:
         print(host)
-
 
 if __name__ == '__main__':
     main(sys.argv[1:])
