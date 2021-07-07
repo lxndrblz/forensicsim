@@ -27,7 +27,7 @@ import json
 import os
 
 from ccl_chrome_indexeddb import ccl_blink_value_deserializer, ccl_chromium_indexeddb, ccl_v8_value_deserializer, \
-    ccl_leveldb
+    ccl_leveldb, ccl_chromium_localstorage, ccl_chromium_sessionstorage
 from ccl_chrome_indexeddb.ccl_chromium_indexeddb import DatabaseMetadataType, ObjectStoreMetadataType
 
 TEAMS_DB_OBJECT_STORES = ['replychains', 'conversations', 'people']
@@ -160,6 +160,34 @@ def parse_db(filepath, do_not_filter=False):
     extracted_values = []
     for record in db.iterate_records(do_not_filter):
         extracted_values.append(record)
+    return extracted_values
+
+
+def parse_localstorage(filepath):
+    local_store = ccl_chromium_localstorage.LocalStoreDb(filepath)
+    extracted_values = []
+    for record in local_store.iter_all_records():
+        try:
+            extracted_values.append(json.loads(record.value))
+        except json.decoder.JSONDecodeError:
+            continue
+    return extracted_values
+
+
+def parse_sessionstorage(filepath):
+    session_storage = ccl_chromium_sessionstorage.SessionStoreDb(filepath)
+    extracted_values = []
+    for host in session_storage:
+        print(host)
+        # Hosts can have multiple sessions associated with them
+        for session_store_values in session_storage.get_all_for_host(host).values():
+            for session_store_value in session_store_values:
+                # response is of type SessionStoreValue
+
+                # Make a nice dictionary out of it
+                entry = {'key': host, 'value': session_store_value.value, 'guid': session_store_value.guid,
+                         'leveldb_sequence_number': session_store_value.leveldb_sequence_number}
+                extracted_values.append(entry)
     return extracted_values
 
 
