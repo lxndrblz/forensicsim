@@ -70,7 +70,11 @@ from org.sleuthkit.datamodel.blackboardutils.attributes.MessageAttachments impor
 
 # Common Prefix Shared for all artefacts
 ARTIFACT_PREFIX = "Microsoft Teams"
+# The directory names that are used by MS Teams
+# https_teams.microsoft.com_0.indexeddb.leveldb is for business and educational accounts
+# https_teams.live.com_0.indexeddb.leveldb is for private organisations
 
+DIRECTORIES = ["https_teams.microsoft.com_0.indexeddb.leveldb", "https_teams.live.com_0.indexeddb.leveldb"]
 
 # Factory that defines the name and details of the module and allows Autopsy
 # to create instances of the modules that will do the analysis.
@@ -543,28 +547,31 @@ class ForensicIMIngestModule(DataSourceIngestModule):
         file_manager = Case.getCurrentCase().getServices().getFileManager()
         directory = "https_teams.microsoft.com_0.indexeddb.leveldb"
 
-        all_ms_teams_leveldbs = file_manager.findFiles(data_source, directory)
+        # There could be both personal and organisational clients on the matchine
+        for directory in DIRECTORIES:
 
-        # Loop over all the files. On a multi user account these could be multiple one.
-        directories_to_process = len(all_ms_teams_leveldbs)
+            all_ms_teams_leveldbs = file_manager.findFiles(data_source, directory)
 
-        self.log(Level.INFO, "Found {} Microsoft Teams directories to process.".format(directories_to_process))
+            # Loop over all the files. On a multi user account these could be multiple one.
+            directories_to_process = len(all_ms_teams_leveldbs)
 
-        for i, content in enumerate(all_ms_teams_leveldbs):
-            # Check if the user pressed cancel while we are processing the files
-            if self.context.isJobCancelled():
-                message = IngestMessage.createMessage(IngestMessage.MessageType.WARNING,
-                                                      ForensicIMIngestModuleFactory.moduleName,
-                                                      "Analysis of LevelDB has been aborted.")
-                IngestServices.getInstance().postMessage(message)
-                return IngestModule.ProcessResult.OK
-            # Update progress both to the progress bar and log which file is currently processed
-            self.log(Level.INFO, "Processing item {} of {}: {}".format(i, directories_to_process, content.getName()))
-            # Ignore false positives
-            if not content.isDir():
-                continue
-            # Where the REAL extraction and analysis happens
-            self._parse_databases(content, progress_bar)
+            self.log(Level.INFO, "Found {} Microsoft Teams directories to process.".format(directories_to_process))
+
+            for i, content in enumerate(all_ms_teams_leveldbs):
+                # Check if the user pressed cancel while we are processing the files
+                if self.context.isJobCancelled():
+                    message = IngestMessage.createMessage(IngestMessage.MessageType.WARNING,
+                                                          ForensicIMIngestModuleFactory.moduleName,
+                                                          "Analysis of LevelDB has been aborted.")
+                    IngestServices.getInstance().postMessage(message)
+                    return IngestModule.ProcessResult.OK
+                # Update progress both to the progress bar and log which file is currently processed
+                self.log(Level.INFO, "Processing item {} of {}: {}".format(i, directories_to_process, content.getName()))
+                # Ignore false positives
+                if not content.isDir():
+                    continue
+                # Where the REAL extraction and analysis happens
+                self._parse_databases(content, progress_bar)
 
         # Once we are done, post a message to the ingest messages box
         # Message type DATA seems most appropriate

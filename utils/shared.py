@@ -37,7 +37,7 @@ The following code is heavily adopted from the RawLevelDb and IndexedDB processi
 
 https://github.com/cclgroupltd/ccl_chrome_indexeddb/blob/35b6a9efba1078cf339f9e64d2796b1f5f7c556f/ccl_chromium_indexeddb.py
 
-It uses an optimized enumeration approach for provessing the metadata, which makes the original IndexedDB super slow.
+It uses an optimized enumeration approach for processing the metadata, which makes the original IndexedDB super slow.
 
 Additionally, it has a flag to filter for datastores, which are interesting for us.
 """
@@ -116,21 +116,21 @@ class FastIndexedDB:
         blink_deserializer = ccl_blink_value_deserializer.BlinkV8Deserializer()
         # Loop through the databases and object stores based on their ids
         for global_id in self.global_metadata.db_ids:
-            print(f"Processing database {global_id.name}")
+            print(f"Processing database: {global_id.name}")
             for object_store_id in range(1, self.database_metadata.get_meta(global_id.dbid_no,
                                                                             DatabaseMetadataType.MaximumObjectStoreId)+1):
 
                 datastore = self.object_store_meta.get_meta(global_id.dbid_no, object_store_id,
                                                             ObjectStoreMetadataType.StoreName)
 
-                print(f"\t Processing object store {datastore}")
+                print(f"\t Processing object store: {datastore}")
+                records_per_object_store = 0
                 if datastore in TEAMS_DB_OBJECT_STORES or do_not_filter:
                     prefix = bytes([0, global_id.dbid_no, object_store_id, 1])
                     for record in self._fetched_records:
                         if record.key.startswith(prefix):
 
-                            if not record.value:
-                                continue
+                            records_per_object_store += 1
                             value_version, varint_raw = ccl_chromium_indexeddb.custom_le_varint_from_bytes(record.value)
                             val_idx = len(varint_raw)
                             # read the blink envelope
@@ -152,10 +152,11 @@ class FastIndexedDB:
                                     obj_raw, host_object_delegate=blink_deserializer.read)
                                 value = deserializer.read()
                                 yield {'key': record.key, 'value': value, 'origin_file': record.origin_file,
-                                       'store': datastore}
+                                       'store': datastore, 'state': record.state, 'seq':record.seq}
                             except Exception as e:
                                 # TODO Some proper error handling wouldn't hurt
                                 continue
+                print(f"\t Records: {records_per_object_store}")
 
 
 def parse_db(filepath, do_not_filter=False):
