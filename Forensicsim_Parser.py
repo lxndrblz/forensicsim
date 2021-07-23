@@ -396,17 +396,14 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                 file_attachments = ArrayList()
                 url_attachments = ArrayList()
 
-                # process the attachments
-                if 'attachments' in message:
-                    if message['attachments'] is not None:
-                        for attachment in message['attachments']:
-                            # Attach files like links
-                            url_attachments.add(URLAttachment(attachment['objectUrl']))
-                # process links
+
+
                 if 'properties' in message:
+                    # process links
                     if 'links' in message['properties']:
                         for link in message['properties']['links']:
                             url_attachments.add(URLAttachment(link['url']))
+                    # process emotions
                     if 'emotions' in message['properties']:
                         for emotion in message['properties']['emotions']:
                             # emotions are grouped by their key like, heart..
@@ -414,7 +411,11 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                             for user in emotion['users']:
                                 self.parse_reaction(message_id, thread_id, user["mri"], phone_number_from, message_text,
                                                     emotion['key'], int(user['time']/1000), teams_leveldb_file_path)
-
+                    # process the attachments
+                    if 'files' in message['properties']:
+                        for attachment in message['properties']['files']:
+                            # Attach files like links
+                            url_attachments.add(URLAttachment(attachment['objectUrl']))
                 message_attachments = MessageAttachments(file_attachments, url_attachments)
                 helper.addAttachments(artifact, message_attachments)
 
@@ -545,7 +546,6 @@ class ForensicIMIngestModule(DataSourceIngestModule):
         # C:\Users\<user>\AppData\Roaming\Microsoft\Teams\IndexedDB\https_teams.microsoft.com_0.indexeddb.leveldb
 
         file_manager = Case.getCurrentCase().getServices().getFileManager()
-        directory = "https_teams.microsoft.com_0.indexeddb.leveldb"
 
         # There could be both personal and organisational clients on the matchine
         for directory in DIRECTORIES:
