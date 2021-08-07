@@ -32,15 +32,38 @@ import pyfiglet.fonts
 from bs4 import BeautifulSoup
 
 import shared
+import sys
 
 MESSAGE_TYPES = {
-    'message': {'creator', 'conversationId', 'content', 'composetime', 'originalarrivaltime',
+    'messages': {'creator', 'conversationId', 'content', 'composetime', 'originalarrivaltime',
                 'clientArrivalTime', 'isFromMe', 'createdTime', 'clientmessageid', 'contenttype', 'messagetype',
                 'version', 'messageKind', 'properties', 'attachments'},
+    'messageMap': {'creator', 'conversationId', 'content', 'id', 'originalArrivalTime',
+                'clientArrivalTime', 'isSentByCurrentUser', 'clientMessageId', 'contentType', 'messageType',
+                'version', 'properties'},
     'contact': {'displayName', 'mri', 'email', 'userPrincipalName'},
+    'buddy': {'displayName', 'mri'},
     'conversation': {'version', 'members', 'clientUpdateTime', 'id', 'threadProperties', 'type'}
 }
 
+def map_updated_teams_keys(value):
+    # Seems like Microsoft discovered duck typing
+    # set the new keys to the old values too
+    value['composetime'] = convert_time_stamps(value['id'])
+    value['createdTime'] = value['id']
+    value['isFromMe'] = value['isSentByCurrentUser']
+    value['originalarrivaltime'] = value['originalArrivalTime']
+    value['clientmessageid'] = value['clientMessageId']
+    value['contenttype'] = value['contentType']
+    value['messagetype'] = value['messageType']
+
+    # remove the new keys
+    del value['isSentByCurrentUser']
+    del value['originalArrivalTime']
+    del value['clientMessageId']
+    del value['contentType']
+    del value['messageType']
+    return value
 
 def strip_html_tags(value):
     try:
@@ -84,55 +107,88 @@ def parse_contacts(contacts):
 
     return cleaned
 
+def parse_budies(buddylists):
+    cleaned = []
+    for buddylist in buddylists:
+        if 'buddies' in buddylist['value']:
+            buddies = buddylist['value']['buddies']
+            for buddy in buddies:
+                try:
+                    x = extract_fields(buddy, 'buddy')
+                    # Add non existent fields as null to match contact type
+                    x['email'] = None
+                    x['userPrincipalName'] = None
+                    x['origin_file'] = buddylist['origin_file']
+                    x['record_type'] = 'contact'
+                    cleaned.append(x)
+                except UnicodeDecodeError or KeyError:
+                    print("Could not decode contact.")
+
+    # Deduplicate based on mri - should be unique anyway
+    cleaned = deduplicate(cleaned, 'mri')
+
+    return cleaned
+
 
 def parse_reply_chain(reply_chains):
     cleaned = []
     for reply_chain in reply_chains:
         value = reply_chain['value']
-        message = value['messages']
-        for key, value in message.items():
-            # parse as a normal chat message
-            try:
-                x = extract_fields(value, 'message')
-                x['origin_file'] = reply_chain['origin_file']
-                # Files send without any description will be of type text
-                if x['messagetype'] == 'RichText/Html' or x['messagetype'] == 'Text':
-                    # Get the call logs
-                    if 'call-log' in x['properties']:
-                        # call logs are string escaped
-                        x['properties']['call-log'] = json.loads(value['properties']['call-log'])
-                        x['record_type'] = 'call'
-                    # Get the reactions from the chat
-                    elif 'activity' in x['properties']:
-                        # reactionInChat are for personal conversations, reactions are for posts or comments
-                        if x['properties']['activity']['activityType'] == 'reactionInChat' or x['properties']['activity']['activityType'] == 'reaction':
-                            x['record_type'] = 'reaction'
-                    # normal message, posts, file transfers
-                    else:
-                        x['content'] = strip_html_tags(x['content'])
-                        x['record_type'] = 'message'
+        # The way of accessing a the nested messages is different depending on the teams version -> check for both
+        message_keys = ['messageMap', 'messages']
+        for message_key in message_keys:
+            if message_key in value:
+                # print(value)
+                message = value[message_key]
+                for key, value in message.items():
+                    # parse as a normal chat message
+                    try:
+                        x = extract_fields(value, message_key)
+                        # reassign the new keys to the old identifiers
+                        if message_key == 'messageMap':
+                            x = map_updated_teams_keys(x)
+                        x['origin_file'] = reply_chain['origin_file']
+                        # Files send without any description will be of type text
+                        # Newer version uses duck typed key
+                        #print(x)
+                        if 'messagetype' in x and (x['messagetype'] == 'RichText/Html' or x['messagetype'] == 'Text'):
+                            # Get the call logs
 
-                        # handle string escaped json arrays within properties
-                        if 'links' in x['properties']:
-                            x['properties']['links'] = json.loads(x['properties']['links'])
-                        if 'files' in x['properties']:
-                            x['properties']['files'] = json.loads(x['properties']['files'])
-                    # convert the timestamps
-                    x['createdTime'] = convert_time_stamps(x['createdTime'])
-                    x['version'] = convert_time_stamps(x['version'])
-                    # manually construct the cachedDeduplicationKey, because not every replychain appears to have this key.
-                    # cachedDeduplicationKey look like 8:orgid:54dd27a7-fbb0-4bf0-8208-a4b31a578a3f6691174965251523000
-                    # They are composed of the:
-                    # -> creator 8:orgid:54dd27a7-fbb0-4bf0-8208-a4b31a578a3f
-                    # -> clientmessageid 6691174965251523000
-                    if x['creator'] is not None and x['clientmessageid'] is not None and 'record_type' in x:
-                        x['cachedDeduplicationKey'] = str(x['creator'] + x['clientmessageid'])
-                        cleaned.append(x)
-                # Other types include ThreadActivity/TopicUpdate and ThreadActivity/AddMember
-                # -> ThreadActivity/TopicUpdate occurs for meeting updates
-                # -> ThreadActivity/AddMember occurs when someone gets added to a chat
-            except UnicodeDecodeError or KeyError as e:
-                print("Could not decode reply chain.")
+                            if 'call-log' in x['properties']:
+                                # call logs are string escaped
+                                x['properties']['call-log'] = json.loads(value['properties']['call-log'])
+                                x['record_type'] = 'call'
+                            # Get the reactions from the chat
+                            elif 'activity' in x['properties']:
+                                # reactionInChat are for personal conversations, reactions are for posts or comments
+                                if x['properties']['activity']['activityType'] == 'reactionInChat' or x['properties']['activity']['activityType'] == 'reaction':
+                                    x['record_type'] = 'reaction'
+                            # normal message, posts, file transfers
+                            else:
+                                x['content'] = strip_html_tags(x['content'])
+                                x['record_type'] = 'message'
+
+                                # handle string escaped json arrays within properties
+                                if 'links' in x['properties']:
+                                    x['properties']['links'] = json.loads(x['properties']['links'])
+                                if 'files' in x['properties']:
+                                    x['properties']['files'] = json.loads(x['properties']['files'])
+                            # convert the timestamps
+                            x['createdTime'] = convert_time_stamps(x['createdTime'])
+                            x['version'] = convert_time_stamps(x['version'])
+                            # manually construct the cachedDeduplicationKey, because not every replychain appears to have this key.
+                            # cachedDeduplicationKey look like 8:orgid:54dd27a7-fbb0-4bf0-8208-a4b31a578a3f6691174965251523000
+                            # They are composed of the:
+                            # -> creator 8:orgid:54dd27a7-fbb0-4bf0-8208-a4b31a578a3f
+                            # -> clientmessageid 6691174965251523000
+                            if x['creator'] is not None and x['clientmessageid'] is not None and 'record_type' in x:
+                                x['cachedDeduplicationKey'] = str(x['creator'] + x['clientmessageid'])
+                                cleaned.append(x)
+                        # Other types include ThreadActivity/TopicUpdate and ThreadActivity/AddMember
+                        # -> ThreadActivity/TopicUpdate occurs for meeting updates
+                        # -> ThreadActivity/AddMember occurs when someone gets added to a chat
+                    except UnicodeDecodeError or KeyError as e:
+                        print("Could not decode reply chain.")
 
     # Deduplicate based on cachedDeduplicationKey, as messages appear often multiple times within
     cleaned = deduplicate(cleaned, 'cachedDeduplicationKey')
@@ -177,6 +233,10 @@ def parse_records(records):
     # parse contacts
     contacts = [d for d in records if d['store'] == 'people']
     parsed_records += parse_contacts(contacts)
+
+    # parse contacts teams 2 personal aka buddies
+    contacts = [d for d in records if d['store'] == 'buddylist']
+    parsed_records += parse_budies(contacts)
 
     # parse text messages, posts, call logs, file transfers
     reply_chains = [d for d in records if d['store'] == 'replychains']
@@ -238,6 +298,7 @@ def cli():
     print(header)
     args = parse_cmdline()
     run(args)
+    sys.exit(0)
 
 
 if __name__ == '__main__':

@@ -70,7 +70,11 @@ from org.sleuthkit.datamodel.blackboardutils.attributes.MessageAttachments impor
 
 # Common Prefix Shared for all artefacts
 ARTIFACT_PREFIX = "Microsoft Teams"
+# The directory names that are used by MS Teams
+# https_teams.microsoft.com_0.indexeddb.leveldb is for business and educational accounts
+# https_teams.live.com_0.indexeddb.leveldb is for private organisations
 
+DIRECTORIES = ["https_teams.microsoft.com_0.indexeddb.leveldb", "https_teams.live.com_0.indexeddb.leveldb"]
 
 # Factory that defines the name and details of the module and allows Autopsy
 # to create instances of the modules that will do the analysis.
@@ -220,6 +224,8 @@ class ForensicIMIngestModule(DataSourceIngestModule):
 
         if imported_records is not None:
             self._process_imported_records(imported_records, content, progress_bar)
+        else:
+            raise IngestModuleException("Extracted data is None.")
 
     def _process_imported_records(self, imported_records, content, progress_bar):
         # Lets attribute the messages to their respective source files
@@ -392,17 +398,14 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                 file_attachments = ArrayList()
                 url_attachments = ArrayList()
 
-                # process the attachments
-                if 'attachments' in message:
-                    if message['attachments'] is not None:
-                        for attachment in message['attachments']:
-                            # Attach files like links
-                            url_attachments.add(URLAttachment(attachment['objectUrl']))
-                # process links
+
+
                 if 'properties' in message:
+                    # process links
                     if 'links' in message['properties']:
                         for link in message['properties']['links']:
                             url_attachments.add(URLAttachment(link['url']))
+                    # process emotions
                     if 'emotions' in message['properties']:
                         for emotion in message['properties']['emotions']:
                             # emotions are grouped by their key like, heart..
@@ -410,7 +413,11 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                             for user in emotion['users']:
                                 self.parse_reaction(message_id, thread_id, user["mri"], phone_number_from, message_text,
                                                     emotion['key'], int(user['time']/1000), teams_leveldb_file_path)
-
+                    # process the attachments
+                    if 'files' in message['properties']:
+                        for attachment in message['properties']['files']:
+                            # Attach files like links
+                            url_attachments.add(URLAttachment(attachment['objectUrl']))
                 message_attachments = MessageAttachments(file_attachments, url_attachments)
                 helper.addAttachments(artifact, message_attachments)
 
@@ -541,30 +548,32 @@ class ForensicIMIngestModule(DataSourceIngestModule):
         # C:\Users\<user>\AppData\Roaming\Microsoft\Teams\IndexedDB\https_teams.microsoft.com_0.indexeddb.leveldb
 
         file_manager = Case.getCurrentCase().getServices().getFileManager()
-        directory = "https_teams.microsoft.com_0.indexeddb.leveldb"
 
-        all_ms_teams_leveldbs = file_manager.findFiles(data_source, directory)
+        # There could be both personal and organisational clients on the matchine
+        for directory in DIRECTORIES:
 
-        # Loop over all the files. On a multi user account these could be multiple one.
-        directories_to_process = len(all_ms_teams_leveldbs)
+            all_ms_teams_leveldbs = file_manager.findFiles(data_source, directory)
 
-        self.log(Level.INFO, "Found {} Microsoft Teams directories to process.".format(directories_to_process))
+            # Loop over all the files. On a multi user account these could be multiple one.
+            directories_to_process = len(all_ms_teams_leveldbs)
 
-        for i, content in enumerate(all_ms_teams_leveldbs):
-            # Check if the user pressed cancel while we are processing the files
-            if self.context.isJobCancelled():
-                message = IngestMessage.createMessage(IngestMessage.MessageType.WARNING,
-                                                      ForensicIMIngestModuleFactory.moduleName,
-                                                      "Analysis of LevelDB has been aborted.")
-                IngestServices.getInstance().postMessage(message)
-                return IngestModule.ProcessResult.OK
-            # Update progress both to the progress bar and log which file is currently processed
-            self.log(Level.INFO, "Processing item {} of {}: {}".format(i, directories_to_process, content.getName()))
-            # Ignore false positives
-            if not content.isDir():
-                continue
-            # Where the REAL extraction and analysis happens
-            self._parse_databases(content, progress_bar)
+            self.log(Level.INFO, "Found {} {} directories to process.".format(directories_to_process, directory))
+
+            for i, content in enumerate(all_ms_teams_leveldbs):
+                # Check if the user pressed cancel while we are processing the files
+                if self.context.isJobCancelled():
+                    message = IngestMessage.createMessage(IngestMessage.MessageType.WARNING,
+                                                          ForensicIMIngestModuleFactory.moduleName,
+                                                          "Analysis of LevelDB has been aborted.")
+                    IngestServices.getInstance().postMessage(message)
+                    return IngestModule.ProcessResult.OK
+                # Update progress both to the progress bar and log which file is currently processed
+                self.log(Level.INFO, "Processing item {} of {}: {}".format(i, directories_to_process, content.getName()))
+                # Ignore false positives
+                if not content.isDir():
+                    continue
+                # Where the REAL extraction and analysis happens
+                self._parse_databases(content, progress_bar)
 
         # Once we are done, post a message to the ingest messages box
         # Message type DATA seems most appropriate

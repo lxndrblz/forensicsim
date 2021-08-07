@@ -30,14 +30,14 @@ from ccl_chrome_indexeddb import ccl_blink_value_deserializer, ccl_chromium_inde
     ccl_leveldb, ccl_chromium_localstorage, ccl_chromium_sessionstorage
 from ccl_chrome_indexeddb.ccl_chromium_indexeddb import DatabaseMetadataType, ObjectStoreMetadataType
 
-TEAMS_DB_OBJECT_STORES = ['replychains', 'conversations', 'people']
+TEAMS_DB_OBJECT_STORES = ['replychains', 'conversations', 'people', 'buddylist']
 
 """
 The following code is heavily adopted from the RawLevelDb and IndexedDB processing proposed by CCL Group
 
 https://github.com/cclgroupltd/ccl_chrome_indexeddb/blob/35b6a9efba1078cf339f9e64d2796b1f5f7c556f/ccl_chromium_indexeddb.py
 
-It uses an optimized enumeration approach for provessing the metadata, which makes the original IndexedDB super slow.
+It uses an optimized enumeration approach for processing the metadata, which makes the original IndexedDB super slow.
 
 Additionally, it has a flag to filter for datastores, which are interesting for us.
 """
@@ -92,8 +92,12 @@ class FastIndexedDB:
                         database_metadata_raw[(db_id.dbid_no, meta_type)] = record
                 if record.key.startswith(prefix_objectstore) and record.state == ccl_leveldb.KeyState.Live:
                     # we only want live keys and the newest version thereof (highest seq)
-                    objstore_id, varint_raw = ccl_chromium_indexeddb.custom_le_varint_from_bytes(
-                        record.key[len(prefix_objectstore):])
+                    try:
+                        objstore_id, varint_raw = ccl_chromium_indexeddb.custom_le_varint_from_bytes(
+                            record.key[len(prefix_objectstore):])
+                    except TypeError:
+                        continue
+
                     meta_type = record.key[len(prefix_objectstore) + len(varint_raw)]
 
                     old_version = objectstore_metadata_raw.get((db_id.dbid_no, objstore_id, meta_type))
@@ -116,20 +120,22 @@ class FastIndexedDB:
         blink_deserializer = ccl_blink_value_deserializer.BlinkV8Deserializer()
         # Loop through the databases and object stores based on their ids
         for global_id in self.global_metadata.db_ids:
-            print(f"Processing database {global_id.name}")
+            # print(f"Processing database: {global_id.name}")
             for object_store_id in range(1, self.database_metadata.get_meta(global_id.dbid_no,
-                                                                            DatabaseMetadataType.MaximumObjectStoreId)+1):
+                                                                            DatabaseMetadataType.MaximumObjectStoreId) + 1):
 
                 datastore = self.object_store_meta.get_meta(global_id.dbid_no, object_store_id,
                                                             ObjectStoreMetadataType.StoreName)
 
-                print(f"\t Processing object store {datastore}")
+                # print(f"\t Processing object store: {datastore}")
+                records_per_object_store = 0
                 if datastore in TEAMS_DB_OBJECT_STORES or do_not_filter:
                     prefix = bytes([0, global_id.dbid_no, object_store_id, 1])
                     for record in self._fetched_records:
                         if record.key.startswith(prefix):
-
-                            if not record.value:
+                            records_per_object_store += 1
+                            # Skip records with empty values as these cant properly decoded
+                            if record.value == b'':
                                 continue
                             value_version, varint_raw = ccl_chromium_indexeddb.custom_le_varint_from_bytes(record.value)
                             val_idx = len(varint_raw)
@@ -152,10 +158,11 @@ class FastIndexedDB:
                                     obj_raw, host_object_delegate=blink_deserializer.read)
                                 value = deserializer.read()
                                 yield {'key': record.key, 'value': value, 'origin_file': record.origin_file,
-                                       'store': datastore}
+                                       'store': datastore, 'state': record.state, 'seq': record.seq}
                             except Exception as e:
                                 # TODO Some proper error handling wouldn't hurt
                                 continue
+                # print(f"\t Records: {records_per_object_store}")
 
 
 def parse_db(filepath, do_not_filter=False):
