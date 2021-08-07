@@ -41,6 +41,7 @@ MESSAGE_TYPES = {
                 'clientArrivalTime', 'isSentByCurrentUser', 'clientMessageId', 'contentType', 'messageType',
                 'version', 'properties'},
     'contact': {'displayName', 'mri', 'email', 'userPrincipalName'},
+    'buddy': {'displayName', 'mri'},
     'conversation': {'version', 'members', 'clientUpdateTime', 'id', 'threadProperties', 'type'}
 }
 
@@ -99,6 +100,28 @@ def parse_contacts(contacts):
             cleaned.append(x)
         except UnicodeDecodeError or KeyError:
             print("Could not decode contact.")
+
+    # Deduplicate based on mri - should be unique anyway
+    cleaned = deduplicate(cleaned, 'mri')
+
+    return cleaned
+
+def parse_budies(buddylists):
+    cleaned = []
+    for buddylist in buddylists:
+        if 'buddies' in buddylist['value']:
+            buddies = buddylist['value']['buddies']
+            for buddy in buddies:
+                try:
+                    x = extract_fields(buddy, 'buddy')
+                    # Add non existent fields as null to match contact type
+                    x['email'] = None
+                    x['userPrincipalName'] = None
+                    x['origin_file'] = buddylist['origin_file']
+                    x['record_type'] = 'contact'
+                    cleaned.append(x)
+                except UnicodeDecodeError or KeyError:
+                    print("Could not decode contact.")
 
     # Deduplicate based on mri - should be unique anyway
     cleaned = deduplicate(cleaned, 'mri')
@@ -209,6 +232,10 @@ def parse_records(records):
     # parse contacts
     contacts = [d for d in records if d['store'] == 'people']
     parsed_records += parse_contacts(contacts)
+
+    # parse contacts teams 2 personal aka buddies
+    contacts = [d for d in records if d['store'] == 'buddylist']
+    parsed_records += parse_budies(contacts)
 
     # parse text messages, posts, call logs, file transfers
     reply_chains = [d for d in records if d['store'] == 'replychains']

@@ -30,7 +30,7 @@ from ccl_chrome_indexeddb import ccl_blink_value_deserializer, ccl_chromium_inde
     ccl_leveldb, ccl_chromium_localstorage, ccl_chromium_sessionstorage
 from ccl_chrome_indexeddb.ccl_chromium_indexeddb import DatabaseMetadataType, ObjectStoreMetadataType
 
-TEAMS_DB_OBJECT_STORES = ['replychains', 'conversations', 'people']
+TEAMS_DB_OBJECT_STORES = ['replychains', 'conversations', 'people', 'buddylist']
 
 """
 The following code is heavily adopted from the RawLevelDb and IndexedDB processing proposed by CCL Group
@@ -92,8 +92,12 @@ class FastIndexedDB:
                         database_metadata_raw[(db_id.dbid_no, meta_type)] = record
                 if record.key.startswith(prefix_objectstore) and record.state == ccl_leveldb.KeyState.Live:
                     # we only want live keys and the newest version thereof (highest seq)
-                    objstore_id, varint_raw = ccl_chromium_indexeddb.custom_le_varint_from_bytes(
-                        record.key[len(prefix_objectstore):])
+                    try:
+                        objstore_id, varint_raw = ccl_chromium_indexeddb.custom_le_varint_from_bytes(
+                            record.key[len(prefix_objectstore):])
+                    except TypeError:
+                        continue
+
                     meta_type = record.key[len(prefix_objectstore) + len(varint_raw)]
 
                     old_version = objectstore_metadata_raw.get((db_id.dbid_no, objstore_id, meta_type))
@@ -118,7 +122,7 @@ class FastIndexedDB:
         for global_id in self.global_metadata.db_ids:
             print(f"Processing database: {global_id.name}")
             for object_store_id in range(1, self.database_metadata.get_meta(global_id.dbid_no,
-                                                                            DatabaseMetadataType.MaximumObjectStoreId)+1):
+                                                                            DatabaseMetadataType.MaximumObjectStoreId) + 1):
 
                 datastore = self.object_store_meta.get_meta(global_id.dbid_no, object_store_id,
                                                             ObjectStoreMetadataType.StoreName)
@@ -129,8 +133,10 @@ class FastIndexedDB:
                     prefix = bytes([0, global_id.dbid_no, object_store_id, 1])
                     for record in self._fetched_records:
                         if record.key.startswith(prefix):
-
                             records_per_object_store += 1
+                            # Skip records with empty values as these cant properly decoded
+                            if record.value == b'':
+                                continue
                             value_version, varint_raw = ccl_chromium_indexeddb.custom_le_varint_from_bytes(record.value)
                             val_idx = len(varint_raw)
                             # read the blink envelope
@@ -152,7 +158,7 @@ class FastIndexedDB:
                                     obj_raw, host_object_delegate=blink_deserializer.read)
                                 value = deserializer.read()
                                 yield {'key': record.key, 'value': value, 'origin_file': record.origin_file,
-                                       'store': datastore, 'state': record.state, 'seq':record.seq}
+                                       'store': datastore, 'state': record.state, 'seq': record.seq}
                             except Exception as e:
                                 # TODO Some proper error handling wouldn't hurt
                                 continue
