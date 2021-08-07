@@ -32,6 +32,7 @@ import pyfiglet.fonts
 from bs4 import BeautifulSoup
 
 import shared
+import sys
 
 MESSAGE_TYPES = {
     'messages': {'creator', 'conversationId', 'content', 'composetime', 'originalarrivaltime',
@@ -297,6 +298,7 @@ def cli():
     print(header)
     args = parse_cmdline()
     run(args)
+    sys.exit(0)
 
 
 if __name__ == '__main__':

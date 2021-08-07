@@ -224,6 +224,8 @@ class ForensicIMIngestModule(DataSourceIngestModule):
 
         if imported_records is not None:
             self._process_imported_records(imported_records, content, progress_bar)
+        else:
+            raise IngestModuleException("Extracted data is None.")
 
     def _process_imported_records(self, imported_records, content, progress_bar):
         # Lets attribute the messages to their respective source files
@@ -555,7 +557,7 @@ class ForensicIMIngestModule(DataSourceIngestModule):
             # Loop over all the files. On a multi user account these could be multiple one.
             directories_to_process = len(all_ms_teams_leveldbs)
 
-            self.log(Level.INFO, "Found {} Microsoft Teams directories to process.".format(directories_to_process))
+            self.log(Level.INFO, "Found {} {} directories to process.".format(directories_to_process, directory))
 
             for i, content in enumerate(all_ms_teams_leveldbs):
                 # Check if the user pressed cancel while we are processing the files
