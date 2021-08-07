@@ -1,6 +1,5 @@
 import json
 import logging
-import os
 import time
 from calendar import timegm
 from time import sleep
@@ -8,15 +7,17 @@ from time import sleep
 import click
 import pause
 import pyautogui
-from pywinauto import keyboard
 import pyfiglet
+from pywinauto import keyboard
 
-# Avoid the default link as it would update Teams on startup
-os.startfile("C:/Program Files/WindowsApps/MicrosoftTeams_21172.622.894.9986_x64__8wekyb3d8bbwe/msteams.exe")
+# Teams could be started from script, but requires change owner permissions. Better to launch Teams 2.0 first and
+# then set the focus to the application.
+# os.startfile("C:/Program Files/WindowsApps/MicrosoftTeams_21197.1103.908.5982_x64__8wekyb3d8bbwe/msteams.exe")
+
 # Wait for Teams to start
 sleep(50)
 # Maximize the window
-pyautogui.hotkey('win','up')
+pyautogui.hotkey('win', 'up')
 sleep(10)
 # Move to chats tab
 pyautogui.hotkey('ctrl', '2')
@@ -25,27 +26,8 @@ logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S
                     filename='data_population_teams.log',
                     level=logging.DEBUG)
 
-
 chat_partner_0 = "JaneDoe@forensics.im"
 chat_partner_1 = "JohnDoe@forensics.im"
-
-def select_chat_channel(contact):
-    try:
-        pyautogui.hotkey('ctrl', 'n')
-        time.sleep(5)
-        # use pywinauto cause pyautogui cant write an add symbol
-        keyboard.send_keys(contact, with_spaces=True, pause=0.1)
-        # Wait for suggestion to load
-        time.sleep(5)
-        # Confirm suggestion
-        pyautogui.press('enter')
-        time.sleep(3)
-        pyautogui.press('enter')
-        time.sleep(3)
-        # Set focus to the text box
-        # pyautogui.press('tab')
-    except Exception as e:
-        print(e)
 
 
 def send_text_message(message):
@@ -68,6 +50,7 @@ def send_media_message(filepath):
         pyautogui.press('enter')
         time.sleep(5)
         pyautogui.write(filepath, interval=0.25)
+        time.sleep(5)
         pyautogui.press('enter')
         time.sleep(30)
         pyautogui.press('enter')
@@ -156,6 +139,7 @@ def populate_data_teams(all_data_to_populate, account):
                 if d["Type"] == "declinecall":
                     # Currently not available in teams 2
                     pass
+
 
 # Load conversation History from JSON
 @click.command()
