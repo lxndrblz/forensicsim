@@ -162,7 +162,7 @@ class FastIndexedDB:
                             except Exception as e:
                                 # TODO Some proper error handling wouldn't hurt
                                 continue
-                # print(f"\t Records: {records_per_object_store}")
+                # print(f"{datastore} {global_id.name} {records_per_object_store}")
 
 
 def parse_db(filepath, do_not_filter=False):
