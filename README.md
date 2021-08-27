@@ -154,11 +154,17 @@ utils\populate_teams.py -a 0 -f conversation.json
 ```
 
 ---
+# Datasets
+This repository comes with two datasets that allow reproducing the findings of this work. The `testdata` folder contains the *LevelDB* databases that have been extracted from two test clients. These can be used for benchmarking without having to perform a (lengthy) data population.
 
-## Acknowledgements & Thanks
+The `populationdata` contains *JSON* files of the communication that has been populated into the testing environment. These can be used to reproduce the experiment from scratch. However, for a rerun, it will be essential to adjust the dates to future dates, as the populator script relies on sufficient breaks between the individual messages.
+
+---
+
+# Acknowledgements & Thanks
 
 - [ccl_chrome_indexeddb](https://github.com/cclgroupltd/ccl_chrome_indexeddb) Python module for enumerating the *
   LevelDB* artefacts without external dependencies.
 - [Gutenberg Project](https://www.gutenberg.org/files/1661/1661-0.txt) Part of Arthur Conan Doyle's book *The Adventures
   of Sherlock Holmes* have been used for creating a natural conversation between the two demo accounts. 
-
+ 
