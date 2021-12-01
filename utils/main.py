@@ -121,8 +121,9 @@ def parse_budies(buddylists):
                     x['origin_file'] = buddylist['origin_file']
                     x['record_type'] = 'contact'
                     cleaned.append(x)
-                except UnicodeDecodeError or KeyError:
-                    print("Could not decode contact.")
+                except UnicodeDecodeError or KeyError  or NameError:
+                    print("Could not decode the following contact (output is not deduplicated).")
+                    print("\t ", buddy)
 
     # Deduplicate based on mri - should be unique anyway
     cleaned = deduplicate(cleaned, 'mri')
@@ -187,8 +188,9 @@ def parse_reply_chain(reply_chains):
                         # Other types include ThreadActivity/TopicUpdate and ThreadActivity/AddMember
                         # -> ThreadActivity/TopicUpdate occurs for meeting updates
                         # -> ThreadActivity/AddMember occurs when someone gets added to a chat
-                    except UnicodeDecodeError or KeyError as e:
-                        print("Could not decode reply chain.")
+                    except UnicodeDecodeError or KeyError  or NameError:
+                        print("Could not decode the following item in the reply chain (output is not deduplicated).")
+                        print("\t ", value)
 
     # Deduplicate based on cachedDeduplicationKey, as messages appear often multiple times within
     cleaned = deduplicate(cleaned, 'cachedDeduplicationKey')
@@ -204,8 +206,8 @@ def parse_conversations(conversations):
             # Include file origin for records
             x['origin_file'] = conversation['origin_file']
             # Make first at sure that the conversation has a cachedDeduplicationKey
-            if conversation['value'].get('lastMessage') is not None:
-                if conversation['value']['lastMessage'].get('cachedDeduplicationKey') is not None:
+            if 'lastMessage' in conversation['value']:
+                if hasattr(conversation['value']['lastMessage'], 'keys') and 'cachedDeduplicationKey' in conversation['value']['lastMessage'].keys():
                     x['cachedDeduplicationKey'] = conversation['value']['lastMessage']['cachedDeduplicationKey']
                     # we are only interested in meetings for now
                     if x['type'] == 'Meeting':
@@ -215,8 +217,9 @@ def parse_conversations(conversations):
                                 x['threadProperties']['meeting'] = json.loads(x['threadProperties']['meeting'])
                                 x['record_type'] = 'meeting'
                                 cleaned.append(x)
-        except UnicodeDecodeError or KeyError:
-            print("Could not decode meeting.")
+        except UnicodeDecodeError or KeyError or AttributeError or TypeError:
+            print("Could not decode the following meeting (output is not deduplicated).")
+            rint("\t ", conversation)
         # Other types include Message, Chat, Space, however, these did not include any records of evidential value
         # for my test data. It might be relevant to investigate these further with a different test scenario.
 
