@@ -92,7 +92,8 @@ def extract_fields(record, keys):
 
 def decode_and_loads(properties):
     if (type(properties) is bytes):
-        properties = properties.decode('iso-8859-1')
+        soup = BeautifulSoup(properties, features="html.parser")
+        properties = properties.decode(soup.original_encoding)
     return json.loads(properties)
 
 def parse_contacts(contacts):
