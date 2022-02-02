@@ -90,6 +90,12 @@ def extract_fields(record, keys):
     return extracted_record
 
 
+def decode_and_loads(properties):
+    if (type(properties) is bytes):
+        soup = BeautifulSoup(properties, features="html.parser")
+        properties = properties.decode(soup.original_encoding)
+    return json.loads(properties)
+
 def parse_contacts(contacts):
     cleaned = []
     for contact in contacts:
@@ -139,7 +145,6 @@ def parse_reply_chain(reply_chains):
         message_keys = ['messageMap', 'messages']
         for message_key in message_keys:
             if message_key in value:
-                # print(value)
                 message = value[message_key]
                 for key, value in message.items():
                     # parse as a normal chat message
@@ -151,13 +156,12 @@ def parse_reply_chain(reply_chains):
                         x['origin_file'] = reply_chain['origin_file']
                         # Files send without any description will be of type text
                         # Newer version uses duck typed key
-                        #print(x)
                         if 'messagetype' in x and (x['messagetype'] == 'RichText/Html' or x['messagetype'] == 'Text'):
                             # Get the call logs
 
                             if 'call-log' in x['properties']:
                                 # call logs are string escaped
-                                x['properties']['call-log'] = json.loads(value['properties']['call-log'])
+                                x['properties']['call-log'] = decode_and_loads(value['properties']['call-log'])
                                 x['record_type'] = 'call'
                             # Get the reactions from the chat
                             elif 'activity' in x['properties']:
@@ -166,14 +170,16 @@ def parse_reply_chain(reply_chains):
                                     x['record_type'] = 'reaction'
                             # normal message, posts, file transfers
                             else:
+
                                 x['content'] = strip_html_tags(x['content'])
+
                                 x['record_type'] = 'message'
 
                                 # handle string escaped json arrays within properties
                                 if 'links' in x['properties']:
-                                    x['properties']['links'] = json.loads(x['properties']['links'])
+                                    x['properties']['links'] = decode_and_loads(x['properties']['links'])
                                 if 'files' in x['properties']:
-                                    x['properties']['files'] = json.loads(x['properties']['files'])
+                                    x['properties']['files'] = decode_and_loads(x['properties']['files'])
                             # convert the timestamps
                             x['createdTime'] = convert_time_stamps(x['createdTime'])
                             x['version'] = convert_time_stamps(x['version'])
@@ -188,7 +194,7 @@ def parse_reply_chain(reply_chains):
                         # Other types include ThreadActivity/TopicUpdate and ThreadActivity/AddMember
                         # -> ThreadActivity/TopicUpdate occurs for meeting updates
                         # -> ThreadActivity/AddMember occurs when someone gets added to a chat
-                    except UnicodeDecodeError or KeyError  or NameError:
+                    except UnicodeDecodeError or KeyError  or NameError as e:
                         print("Could not decode the following item in the reply chain (output is not deduplicated).")
                         print("\t ", value)
 
@@ -214,12 +220,12 @@ def parse_conversations(conversations):
                         # assign the type for further processing as the object store might not be sufficient
                         if 'threadProperties' in x:
                             if 'meeting' in x['threadProperties']:
-                                x['threadProperties']['meeting'] = json.loads(x['threadProperties']['meeting'])
+                                x['threadProperties']['meeting'] = decode_and_loads(x['threadProperties']['meeting'])
                                 x['record_type'] = 'meeting'
                                 cleaned.append(x)
         except UnicodeDecodeError or KeyError or AttributeError or TypeError:
             print("Could not decode the following meeting (output is not deduplicated).")
-            rint("\t ", conversation)
+            print("\t ", conversation)
         # Other types include Message, Chat, Space, however, these did not include any records of evidential value
         # for my test data. It might be relevant to investigate these further with a different test scenario.
 

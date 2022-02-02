@@ -205,8 +205,8 @@ def parse_sessionstorage(filepath):
 def write_results_to_json(data, outputpath):
     # Dump messages into a json file
     try:
-        with open(outputpath, 'w') as f:
-            json.dump(data, f, indent=4, sort_keys=True, default=str)
+        with open(outputpath, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=4, sort_keys=True, default=str, ensure_ascii=False)
     except EnvironmentError as e:
         print(e)
 
