@@ -4,3 +4,4 @@ pyfiglet~=0.8.post1
 colorama~=0.4.4
 beautifulsoup4~=4.9.3
 click~=8.0.1
+wxPython
