@@ -199,7 +199,6 @@ def parse_reply_chain(reply_chains):
                     except UnicodeDecodeError or KeyError  or NameError as e:
                         print("Could not decode the following item in the reply chain (output is not deduplicated).")
                         print("\t ", value)
-                        raise e
 
     # Deduplicate based on cachedDeduplicationKey, as messages appear often multiple times within
     cleaned = deduplicate(cleaned, 'cachedDeduplicationKey')
