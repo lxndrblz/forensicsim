@@ -303,7 +303,7 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                 BlackboardAttribute(self.att_reaction_timestamp, ForensicIMIngestModuleFactory.moduleName,
                                     timestamp))
             self.index_artifact(art)
-        except TskCoreException as ex:
+        except (Exception, TskCoreException) as ex:
             # Severe error trying to add to case database.. case is not complete.
             # These exceptions are thrown by the CommunicationArtifactsHelper.
             self._logger.log(Level.SEVERE,
@@ -328,7 +328,7 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                     BlackboardAttribute(BlackboardAttribute.ATTRIBUTE_TYPE.TSK_ID, ARTIFACT_PREFIX, contact['mri']))
                 helper.addContact(contact_name, contact_phone_number, contact_home_phone_number,
                                   contact_mobile_phone_number, contact_email, additional_attributes)
-        except TskCoreException as e:
+        except (TskCoreException, Exception) as e:
             self._logger.log(Level.SEVERE,
                              "Error adding Microsoft Teams contact artifacts to the case database.", e)
         except BlackboardException as e:
@@ -347,7 +347,7 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                 end_date = self.date_to_long(call['properties']['call-log']['endTime'])
 
                 helper.addCalllog(call_direction, from_address, to_address, start_date, end_date, CallMediaType.UNKNOWN)
-        except TskCoreException as ex:
+        except (Exception, TskCoreException) as ex:
             # These exceptions are thrown by the CommunicationArtifactsHelper.
             self._logger.log(Level.SEVERE,
                              "Failed to add call log artifacts to the case database.", ex)
@@ -423,7 +423,7 @@ class ForensicIMIngestModule(DataSourceIngestModule):
 
 
 
-        except TskCoreException as ex:
+        except (Exception, TskCoreException) as ex:
             # Severe error trying to add to case database.. case is not complete.
             # These exceptions are thrown by the CommunicationArtifactsHelper.
             self._logger.log(Level.SEVERE,
@@ -463,7 +463,7 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                                         calendar_entry_organizer))
                 self.index_artifact(art)
 
-        except TskCoreException as ex:
+        except (Exception, TskCoreException) as ex:
             # Severe error trying to add to case database.. case is not complete.
             # These exceptions are thrown by the CommunicationArtifactsHelper.
             self._logger.log(Level.SEVERE,
