@@ -94,7 +94,8 @@ def decode_and_loads(properties):
     if (type(properties) is bytes):
         soup = BeautifulSoup(properties, features="html.parser")
         properties = properties.decode(soup.original_encoding)
-    return json.loads(properties)
+
+    return json.loads(properties, strict=False)
 
 def parse_contacts(contacts):
     cleaned = []
@@ -194,9 +195,11 @@ def parse_reply_chain(reply_chains):
                         # Other types include ThreadActivity/TopicUpdate and ThreadActivity/AddMember
                         # -> ThreadActivity/TopicUpdate occurs for meeting updates
                         # -> ThreadActivity/AddMember occurs when someone gets added to a chat
+
                     except UnicodeDecodeError or KeyError  or NameError as e:
                         print("Could not decode the following item in the reply chain (output is not deduplicated).")
                         print("\t ", value)
+                        raise e
 
     # Deduplicate based on cachedDeduplicationKey, as messages appear often multiple times within
     cleaned = deduplicate(cleaned, 'cachedDeduplicationKey')
