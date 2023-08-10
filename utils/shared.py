@@ -74,6 +74,9 @@ class FastIndexedDB:
 
         # Loop through the database IDs
         for db_id in global_metadata.db_ids:
+            if None == db_id.dbid_no:
+                continue
+
             if db_id.dbid_no > 0x7f:
                 raise NotImplementedError("there could be this many dbs, but I don't support it yet")
 
@@ -121,6 +124,10 @@ class FastIndexedDB:
         # Loop through the databases and object stores based on their ids
         for global_id in self.global_metadata.db_ids:
             # print(f"Processing database: {global_id.name}")
+            if None == global_id.dbid_no:
+                print(f"WARNING: Skipping database {global_id.name}")
+                continue
+
             for object_store_id in range(1, self.database_metadata.get_meta(global_id.dbid_no,
                                                                             DatabaseMetadataType.MaximumObjectStoreId) + 1):
 
