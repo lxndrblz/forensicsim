@@ -126,3 +126,6 @@ dmypy.json
 .idea/
 
 .jython_cache/
+
+venv/
+env/
