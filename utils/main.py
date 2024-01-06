@@ -68,8 +68,6 @@ MESSAGE_TYPES = {
         "version",
         "properties",
     },
-    "contact": {"displayName", "mri", "email", "userPrincipalName"},
-    "buddy": {"displayName", "mri"},
     "conversation": {
         "version",
         "members",
@@ -175,7 +173,7 @@ def parse_people(people: list[dict]) -> set(Contact):
 def parse_buddies(buddies: list[dict]) -> set(Contact):
     parsed_buddies = []
     for rec in buddies:
-        kwargs = rec.get("value", {}).get("buddies") | {
+        kwargs = rec.get("value", {}).get("buddies", {}) | {
             "origin_file": rec.get("origin_file")
         }
         parsed_buddies.add(Contact(**kwargs))
@@ -319,7 +317,7 @@ def parse_records(records):
     people = [d for d in records if d["store"] == "people"]
     parsed_records += parse_people(people)
 
-    # parse people teams 2 personal aka buddies
+    # parse buddies
     people = [d for d in records if d["store"] == "buddylist"]
     parsed_records += parse_buddies(people)
 
@@ -346,17 +344,16 @@ def deduplicate(records, key):
 def process_db(filepath, output_path):
     # Do some basic error handling
     if not filepath.endswith("leveldb"):
-        raise Exception("Expected a leveldb folder. Path: {}".format(filepath))
+        raise ValueError(f"Expected a leveldb folder. Path: {filepath}")
 
     p = Path(filepath)
     if not p.exists():
-        raise Exception("Given file path does not exists. Path: {}".format(filepath))
+        raise FileNotFoundError(f"Given file path does not exist. Path: {filepath}")
 
     if not p.is_dir():
-        raise Exception("Given file path is not a folder. Path: {}".format(filepath))
+        raise NotADirectoryError(f"Given file path is not a folder. Path: {filepath}")
 
     # convert the database to a python list with nested dictionaries
-
     extracted_values = shared.parse_db(filepath)
 
     # parse records
