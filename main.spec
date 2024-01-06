@@ -5,7 +5,7 @@ block_cipher = None
 
 a = Analysis(['utils\\main.py'],
              binaries=[],
-             datas=[('C:/Python39/Lib/site-packages/pyfiglet', 'pyfiglet')],
+             datas=[('c:\hostedtoolcache\windows\python\*\x64\lib\site-packages\pyfiglet', 'pyfiglet')],
              hiddenimports=[],
              hookspath=[],
              runtime_hooks=[],
