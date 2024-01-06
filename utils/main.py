@@ -22,6 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+from typing import Any
 import argparse
 import json
 from datetime import datetime
@@ -68,32 +69,83 @@ MESSAGE_TYPES = {
         "version",
         "properties",
     },
-    "conversation": {
-        "version",
-        "members",
-        "clientUpdateTime",
-        "id",
-        "threadProperties",
-        "type",
-    },
 }
 
 
 @dataclass(init=False)
-class Contact:
-    # values
-    displayName: str | None = None
-    mri: str | None = None
-    email: str | None = None
-    userPrincipalName: str | None = None
-
-    # store + origin_file
-    origin_file: str | None = None
-    record_type: str = "contact"
+class Conversation:
+    clientUpdateTime: str | None = None
+    cachedDeduplicationKey: str | None = None
+    id: str | None = None
+    members: list[dict] | None = []
+    record_type: str | None = None
+    threadProperties: dict[str, Any] | None = {}
+    type: str | None = None
+    version: float | None = None
 
     def __init__(self, **kwargs):
         # allow to pass optional kwargs
         # https://stackoverflow.com/a/54678706/5755604
+        names = set([f.name for f in fields(self)])
+        for k, v in kwargs.items():
+            if k in names:
+                setattr(self, k, v)
+
+    def __eq__(self, other):
+        return self.cachedDeduplicationKey == other.cachedDeduplicationKey
+
+    def __hash__(self):
+        return hash(("cachedDeduplicationKey", self.cachedDeduplicationKey))
+
+
+@dataclass(init=False)
+class Message:
+    attachments: list[Any] | None = []
+    clientArrivalTime: str | None = None
+    clientmessageid: str | None = None
+    clientmessageid: str | None = None
+    composetime: str | None = None
+    content: str | None = None
+    contenttype: str | None = None
+    createdTime: str | None = None
+    creator: str | None = None
+    isFromMe: bool | None = None
+    messageKind: str | None = None
+    messagetype: str | None = None
+    originalarrivaltime: str | None = None
+    properties: dict[str, Any] | None = {}
+    record_type: str | None = None
+    version: str | None = None
+
+    def __init__(self, **kwargs):
+        # allow to pass optional kwargs
+        # https://stackoverflow.com/a/54678706/5755604
+        names = set([f.name for f in fields(self)])
+        for k, v in kwargs.items():
+            if k in names:
+                setattr(self, k, v)
+
+    def __eq__(self, other):
+        return (
+            self.creator == other.creator
+            and self.clientmessageid == other.clientmessageid
+        )
+
+    def __hash__(self):
+        return hash(("creator", self.creator, "clientmessageid", self.clientmessageid))
+
+
+@dataclass(init=False)
+class Contact:
+    displayName: str | None = None
+    email: str | None = None
+    mri: str | None = None
+    origin_file: str | None = None
+    record_type: str = "contact"
+    userPrincipalName: str | None = None
+
+    def __init__(self, **kwargs):
+        # allow to pass optional kwargs
         names = set([f.name for f in fields(self)])
         for k, v in kwargs.items():
             if k in names:
@@ -162,22 +214,51 @@ def decode_and_loads(properties):
     return json.loads(properties)
 
 
-def parse_people(people: list[dict]) -> set(Contact):
-    parsed_people = []
+def _parse_people(people: list[dict]) -> set(Contact):
+    parsed_people = set()
     for rec in people:
         kwargs = rec.get("value", {}) | {"origin_file": rec.get("origin_file")}
         parsed_people.add(Contact(**kwargs))
-    return set(parsed_people)
+    return parsed_people
 
 
-def parse_buddies(buddies: list[dict]) -> set(Contact):
-    parsed_buddies = []
+def _parse_buddies(buddies: list[dict]) -> set(Contact):
+    parsed_buddies = set()
     for rec in buddies:
         kwargs = rec.get("value", {}).get("buddies", {}) | {
             "origin_file": rec.get("origin_file")
         }
         parsed_buddies.add(Contact(**kwargs))
-    return set(parsed_buddies)
+    return parsed_buddies
+
+
+def _parse_conversations(conversations: list[dict]) -> set(Conversation):
+    cleaned_conversations = set()
+    for rec in conversations:
+        last_message = rec.get("value", {}).get("lastMessage", {})
+
+        kwargs = rec.get("value", {}) | {
+            "origin_file": rec.get("origin_file"),
+            "cachedDeduplicationKey": last_message.get("cachedDeduplicationKey"),
+            "type": rec.get("type"),
+            "threadProperties": rec.get("threadProperties"),
+        }
+
+        if kwargs["type"] == "Meeting" and "meeting" in kwargs["threadProperties"]:
+            kwargs["threadProperties"]["meeting"] = decode_and_loads(
+                kwargs["threadProperties"]["meeting"]
+            )
+            kwargs["record_type"] = "meeting"
+            cleaned_conversations.add(Conversation(**kwargs))
+        # Other types include Message, Chat, Space, however, these did not include any records of evidential value
+        # for my test data. It might be relevant to investigate these further with a different test scenario.
+
+    return cleaned_conversations
+
+
+# def _parse_reply_chain(reply_chains: list[dict]) -> set(Messages):
+#     cleaned_reply_chains = set()
+#     for reply_chain in reply_chains:
 
 
 def parse_reply_chain(reply_chains):
@@ -267,47 +348,6 @@ def parse_reply_chain(reply_chains):
     return cleaned
 
 
-def parse_conversations(conversations):
-    cleaned = []
-    for conversation in conversations:
-        try:
-            value = conversation["value"]
-            x = extract_fields(value, "conversation")
-            # Include file origin for records
-            x["origin_file"] = conversation["origin_file"]
-            # Make first at sure that the conversation has a cachedDeduplicationKey
-            if "lastMessage" in conversation["value"]:
-                if (
-                    hasattr(conversation["value"]["lastMessage"], "keys")
-                    and "cachedDeduplicationKey"
-                    in conversation["value"]["lastMessage"].keys()
-                ):
-                    x["cachedDeduplicationKey"] = conversation["value"]["lastMessage"][
-                        "cachedDeduplicationKey"
-                    ]
-                    # we are only interested in meetings for now
-                    if x["type"] == "Meeting":
-                        # assign the type for further processing as the object store might not be sufficient
-                        if "threadProperties" in x:
-                            if "meeting" in x["threadProperties"]:
-                                x["threadProperties"]["meeting"] = decode_and_loads(
-                                    x["threadProperties"]["meeting"]
-                                )
-                                x["record_type"] = "meeting"
-                                cleaned.append(x)
-        except UnicodeDecodeError or KeyError or AttributeError or TypeError:
-            print(
-                "Could not decode the following meeting (output is not deduplicated)."
-            )
-            print("\t ", conversation)
-        # Other types include Message, Chat, Space, however, these did not include any records of evidential value
-        # for my test data. It might be relevant to investigate these further with a different test scenario.
-
-    # Deduplicate
-    cleaned = deduplicate(cleaned, "cachedDeduplicationKey")
-    return cleaned
-
-
 def parse_records(records):
     parsed_records = []
 
@@ -315,11 +355,11 @@ def parse_records(records):
 
     # parse people
     people = [d for d in records if d["store"] == "people"]
-    parsed_records += parse_people(people)
+    parsed_records += _parse_people(people)
 
     # parse buddies
     people = [d for d in records if d["store"] == "buddylist"]
-    parsed_records += parse_buddies(people)
+    parsed_records += _parse_buddies(people)
 
     # parse text messages, posts, call logs, file transfers
     reply_chains = [d for d in records if d["store"] == "replychains"]
@@ -327,18 +367,9 @@ def parse_records(records):
 
     # parse meetings
     conversations = [d for d in records if d["store"] == "conversations"]
-    parsed_records += parse_conversations(conversations)
+    parsed_records += _parse_conversations(conversations)
 
     return parsed_records
-
-
-def deduplicate(records, key):
-    distinct_records = [
-        i
-        for n, i in enumerate(records)
-        if i.get(key) not in [y.get(key) for y in records[n + 1 :]]
-    ]
-    return distinct_records
 
 
 def process_db(filepath, output_path):
