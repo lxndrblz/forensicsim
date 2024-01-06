@@ -41,13 +41,16 @@ def log(msg):
 
 class ElementType(enum.IntEnum):
     """Run type in the compressed snappy data (literal data or offset to backreferenced data_"""
+
     Literal = 0
     CopyOneByte = 1
     CopyTwoByte = 2
     CopyFourByte = 3
 
 
-def _read_le_varint(stream: typing.BinaryIO) -> typing.Optional[typing.Tuple[int, bytes]]:
+def _read_le_varint(
+    stream: typing.BinaryIO,
+) -> typing.Optional[typing.Tuple[int, bytes]]:
     """Read varint from a stream.
     If the read is successful: returns a tuple of the (unsigned) value and the raw bytes making up that varint,
     otherwise returns None"""
@@ -59,9 +62,9 @@ def _read_le_varint(stream: typing.BinaryIO) -> typing.Optional[typing.Tuple[int
         raw = stream.read(1)
         if len(raw) < 1:
             return None
-        tmp, = raw
+        (tmp,) = raw
         underlying_bytes.append(tmp)
-        result |= ((tmp & 0x7f) << (i * 7))
+        result |= (tmp & 0x7F) << (i * 7)
         if (tmp & 0x80) == 0:
             break
         i += 1
@@ -171,7 +174,9 @@ def decompress(data: typing.BinaryIO) -> bytes:
             # have to read incrementally because you might have to read data that you've just written
             # this is probably a really slow way of doing this.
             for i in range(length):
-                out.write(out.getbuffer()[actual_offset + i: actual_offset + i + 1].tobytes())
+                out.write(
+                    out.getbuffer()[actual_offset + i : actual_offset + i + 1].tobytes()
+                )
 
     result = out.getvalue()
     if uncompressed_length != len(result):
@@ -184,6 +189,7 @@ def decompress(data: typing.BinaryIO) -> bytes:
 def main(path):
     import pathlib
     import hashlib
+
     f = pathlib.Path(path).open("rb")
     decompressed = decompress(f)
     print(decompressed)

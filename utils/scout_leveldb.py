@@ -41,9 +41,14 @@ class DetailView(wx.Dialog):
         title = "Detail View"
         super().__init__(parent=None, title=title)
         self.main_sizer = wx.BoxSizer(wx.VERTICAL)
-        self.logs = wx.TextCtrl(self, id=-1, value='', pos=wx.DefaultPosition,
-                                size=(-1, 300),
-                                style=wx.TE_MULTILINE | wx.SUNKEN_BORDER)
+        self.logs = wx.TextCtrl(
+            self,
+            id=-1,
+            value="",
+            pos=wx.DefaultPosition,
+            size=(-1, 300),
+            style=wx.TE_MULTILINE | wx.SUNKEN_BORDER,
+        )
         self.logs.AppendText(db_record.value + "\n")
         self.main_sizer.Add(self.logs, 0, wx.ALL | wx.EXPAND, 5)
         self.SetSizer(self.main_sizer)
@@ -58,14 +63,13 @@ class DBScoutPanel(wx.Panel):
         self.search.ShowCancelButton(True)
         # List the key value pairs
         self.list_ctrl = wx.ListCtrl(
-            self, size=(-1, 400),
-            style=wx.LC_REPORT | wx.BORDER_SUNKEN
+            self, size=(-1, 400), style=wx.LC_REPORT | wx.BORDER_SUNKEN
         )
-        self.list_ctrl.InsertColumn(0, 'Key', width=140)
-        self.list_ctrl.InsertColumn(1, 'Value', width=200)
-        self.list_ctrl.InsertColumn(2, 'Origin', width=140)
+        self.list_ctrl.InsertColumn(0, "Key", width=140)
+        self.list_ctrl.InsertColumn(1, "Value", width=200)
+        self.list_ctrl.InsertColumn(2, "Origin", width=140)
         # Add a button for showing the active entry
-        self.show_button = wx.Button(self, label='Show')
+        self.show_button = wx.Button(self, label="Show")
         self.show_button.Bind(wx.EVT_BUTTON, self.on_show)
 
         main_sizer.Add(self.search, 0, wx.ALL | wx.EXPAND, 15)
@@ -87,16 +91,14 @@ class DBScoutPanel(wx.Panel):
 
     def setup_list_ctr(self):
         self.list_ctrl.ClearAll()
-        self.list_ctrl.InsertColumn(0, 'Key', width=140)
-        self.list_ctrl.InsertColumn(1, 'Value', width=200)
-        self.list_ctrl.InsertColumn(2, 'Origin', width=140)
+        self.list_ctrl.InsertColumn(0, "Key", width=140)
+        self.list_ctrl.InsertColumn(1, "Value", width=200)
+        self.list_ctrl.InsertColumn(2, "Origin", width=140)
 
     def insert_list_item(self, i, extracted_value):
         self.list_ctrl.InsertItem(i, extracted_value.key)
-        self.list_ctrl.SetItem(i, 1,
-                               extracted_value.value)
-        self.list_ctrl.SetItem(i, 2,
-                               extracted_value.store)
+        self.list_ctrl.SetItem(i, 1, extracted_value.value)
+        self.list_ctrl.SetItem(i, 2, extracted_value.store)
 
     def OnSearchCancel(self, evt):
         self.leveldb = self.leveldb_unfiltered
@@ -123,15 +125,19 @@ class DBScoutPanel(wx.Panel):
     def update_leveldb_listing(self, filepath):
         self.setup_list_ctr()
         # Do some basic error handling
-        if not filepath.endswith('leveldb'):
-            raise Exception('Expected a leveldb folder. Path: {}'.format(filepath))
+        if not filepath.endswith("leveldb"):
+            raise Exception("Expected a leveldb folder. Path: {}".format(filepath))
 
         p = Path(filepath)
         if not p.exists():
-            raise Exception('Given file path does not exists. Path: {}'.format(filepath))
+            raise Exception(
+                "Given file path does not exists. Path: {}".format(filepath)
+            )
 
         if not p.is_dir():
-            raise Exception('Given file path is not a folder. Path: {}'.format(filepath))
+            raise Exception(
+                "Given file path is not a folder. Path: {}".format(filepath)
+            )
 
         # convert the database to a python list with nested dictionaries
         extracted_records = shared.parse_db(filepath)
@@ -139,7 +145,12 @@ class DBScoutPanel(wx.Panel):
         for record in extracted_records:
             try:
                 processed_records.append(
-                    DataRecord(str(record['key']), str(record['value']), str(record['origin_file'])))
+                    DataRecord(
+                        str(record["key"]),
+                        str(record["value"]),
+                        str(record["origin_file"]),
+                    )
+                )
             except UnicodeDecodeError:
                 continue
 
@@ -151,8 +162,7 @@ class DBScoutPanel(wx.Panel):
 
 class DBScoutFrame(wx.Frame):
     def __init__(self):
-        super().__init__(parent=None,
-                         title='Forensics.im LevelDB Scout')
+        super().__init__(parent=None, title="Forensics.im LevelDB Scout")
         self.panel = DBScoutPanel(self)
         self.create_menu()
         self.SetIcon(wx.Icon("resources/favicon.ico", wx.BITMAP_TYPE_ICO))
@@ -164,10 +174,9 @@ class DBScoutFrame(wx.Frame):
         menu_bar = wx.MenuBar()
         file_menu = wx.Menu()
         open_folder_menu_item = file_menu.Append(
-            wx.ID_ANY, 'Open LevelDB',
-            'Open a LevelDB'
+            wx.ID_ANY, "Open LevelDB", "Open a LevelDB"
         )
-        menu_bar.Append(file_menu, '&File')
+        menu_bar.Append(file_menu, "&File")
         self.Bind(
             event=wx.EVT_MENU,
             handler=self.on_open_folder,
@@ -177,8 +186,7 @@ class DBScoutFrame(wx.Frame):
 
     def on_open_folder(self, event):
         title = "Choose a directory:"
-        dlg = wx.DirDialog(self, title,
-                           style=wx.DD_DEFAULT_STYLE)
+        dlg = wx.DirDialog(self, title, style=wx.DD_DEFAULT_STYLE)
         if dlg.ShowModal() == wx.ID_OK:
             self.panel.update_leveldb_listing(dlg.GetPath())
         dlg.Destroy()
@@ -193,7 +201,7 @@ class DBScoutFrame(wx.Frame):
         self.SetSize(self.MinSize)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app = wx.App()
     frame = DBScoutFrame()
     app.MainLoop()

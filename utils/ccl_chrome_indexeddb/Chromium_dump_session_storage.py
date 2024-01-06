@@ -53,7 +53,9 @@ CREATE VIEW items_view AS
 """
 
 INSERT_HOST_SQL = """INSERT INTO "hosts" ("host") VALUES (?);"""
-INSERT_ITEM_SQL = """INSERT INTO "items" (host, guid, ldbseq, key, value) VALUES (?, ?, ?, ?, ?);"""
+INSERT_ITEM_SQL = (
+    """INSERT INTO "items" (host, guid, ldbseq, key, value) VALUES (?, ?, ?, ?, ?);"""
+)
 
 
 def main(args):
@@ -75,17 +77,23 @@ def main(args):
 
         for key, values in host_kvs.items():
             for value in values:
-                cur.execute(INSERT_ITEM_SQL, (host_id, None, value.leveldb_sequence_number, key, value.value))
+                cur.execute(
+                    INSERT_ITEM_SQL,
+                    (host_id, None, value.leveldb_sequence_number, key, value.value),
+                )
 
     for key, value in session_storage.iter_orphans():
-        cur.execute(INSERT_ITEM_SQL, (None, None, value.leveldb_sequence_number, key, value.value))
+        cur.execute(
+            INSERT_ITEM_SQL,
+            (None, None, value.leveldb_sequence_number, key, value.value),
+        )
 
     cur.close()
     out_db.commit()
     out_db.close()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     if len(sys.argv) != 3:
         print(f"{pathlib.Path(sys.argv[0]).name} <leveldb dir> <out.db>")
         exit(1)

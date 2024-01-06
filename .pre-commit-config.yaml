@@ -14,3 +14,8 @@ repos:
       - id: debug-statements
       - id: end-of-file-fixer
       - id: mixed-line-ending
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.11
+    hooks:
+    - id: ruff-format
+exclude: "^(export|populationdata|testdata)"

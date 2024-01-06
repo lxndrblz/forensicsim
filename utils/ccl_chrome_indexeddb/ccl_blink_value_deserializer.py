@@ -49,7 +49,9 @@ from . import ccl_v8_value_deserializer
 # used with ObjectReferenceTag to tie the recursive knot.
 
 __version__ = "0.1"
-__description__ = "Partial reimplementation of the Blink Javascript Object Serialization"
+__description__ = (
+    "Partial reimplementation of the Blink Javascript Object Serialization"
+)
 __contact__ = "Alex Caithness"
 
 __DEBUG = True
@@ -75,50 +77,56 @@ class BlobIndex:
 
 class Constants:
     tag_kMessagePortTag = b"M"  # index:int -> MessagePort. Fills the result with
-                                # transferred MessagePort.
-    tag_kMojoHandleTag = b"h"   # index:int -> MojoHandle. Fills the result with
-                                # transferred MojoHandle.
-    tag_kBlobTag = b"b"         # uuid:WebCoreString, type:WebCoreString, size:uint64_t ->
-                                # Blob (ref)
-    tag_kBlobIndexTag = b"i"    # index:int32_t -> Blob (ref)
-    tag_kFileTag = b"f"         # file:RawFile -> File (ref)
-    tag_kFileIndexTag = b"e"    # index:int32_t -> File (ref)
+    # transferred MessagePort.
+    tag_kMojoHandleTag = b"h"  # index:int -> MojoHandle. Fills the result with
+    # transferred MojoHandle.
+    tag_kBlobTag = b"b"  # uuid:WebCoreString, type:WebCoreString, size:uint64_t ->
+    # Blob (ref)
+    tag_kBlobIndexTag = b"i"  # index:int32_t -> Blob (ref)
+    tag_kFileTag = b"f"  # file:RawFile -> File (ref)
+    tag_kFileIndexTag = b"e"  # index:int32_t -> File (ref)
     tag_kDOMFileSystemTag = b"d"  # type : int32_t, name:WebCoreString,
-                                  # uuid:WebCoreString -> FileSystem (ref)
+    # uuid:WebCoreString -> FileSystem (ref)
     tag_kNativeFileSystemFileHandleTag = b"n"  # name:WebCoreString, index:uint32_t
-                                               # -> NativeFileSystemFileHandle (ref)
-    tag_kNativeFileSystemDirectoryHandleTag = b"N"  # name:WebCoreString, index:uint32_t ->
-                                                   # NativeFileSystemDirectoryHandle (ref)
-    tag_kFileListTag = b"l"                     # length:uint32_t, files:RawFile[length] -> FileList (ref)
-    tag_kFileListIndexTag = b"L"                # length:uint32_t, files:int32_t[length] -> FileList (ref)
-    tag_kImageDataTag = b"#"                   # tags terminated by ImageSerializationTag::kEnd (see
-                                               # SerializedColorParams.h), width:uint32_t,
-                                               # height:uint32_t, pixelDataLength:uint64_t,
-                                               # data:byte[pixelDataLength]
-                                               # -> ImageData (ref)
-    tag_kImageBitmapTag = b"g"        # tags terminated by ImageSerializationTag::kEnd (see
-                                      # SerializedColorParams.h), width:uint32_t,
-                                      # height:uint32_t, pixelDataLength:uint32_t,
-                                      # data:byte[pixelDataLength]
-                                      # -> ImageBitmap (ref)
-    tag_kImageBitmapTransferTag = b"G"      # index:uint32_t -> ImageBitmap. For ImageBitmap transfer
+    # -> NativeFileSystemFileHandle (ref)
+    tag_kNativeFileSystemDirectoryHandleTag = (
+        b"N"  # name:WebCoreString, index:uint32_t ->
+    )
+    # NativeFileSystemDirectoryHandle (ref)
+    tag_kFileListTag = b"l"  # length:uint32_t, files:RawFile[length] -> FileList (ref)
+    tag_kFileListIndexTag = (
+        b"L"  # length:uint32_t, files:int32_t[length] -> FileList (ref)
+    )
+    tag_kImageDataTag = b"#"  # tags terminated by ImageSerializationTag::kEnd (see
+    # SerializedColorParams.h), width:uint32_t,
+    # height:uint32_t, pixelDataLength:uint64_t,
+    # data:byte[pixelDataLength]
+    # -> ImageData (ref)
+    tag_kImageBitmapTag = b"g"  # tags terminated by ImageSerializationTag::kEnd (see
+    # SerializedColorParams.h), width:uint32_t,
+    # height:uint32_t, pixelDataLength:uint32_t,
+    # data:byte[pixelDataLength]
+    # -> ImageBitmap (ref)
+    tag_kImageBitmapTransferTag = (
+        b"G"  # index:uint32_t -> ImageBitmap. For ImageBitmap transfer
+    )
     tag_kOffscreenCanvasTransferTag = b"H"  # index, width, height, id,
-                                            # filter_quality::uint32_t ->
-                                            # OffscreenCanvas. For OffscreenCanvas
-                                            # transfer
-    tag_kReadableStreamTransferTag = b"r"    # index:uint32_t
-    tag_kTransformStreamTransferTag = b"m"   # index:uint32_t
-    tag_kWritableStreamTransferTag = b"w"    # index:uint32_t
-    tag_kDOMPointTag = b"Q"                  # x:Double, y:Double, z:Double, w:Double
-    tag_kDOMPointReadOnlyTag = b"W"          # x:Double, y:Double, z:Double, w:Double
-    tag_kDOMRectTag = b"E"                   # x:Double, y:Double, width:Double, height:Double
-    tag_kDOMRectReadOnlyTag = b"R"           # x:Double, y:Double, width:Double, height:Double
-    tag_kDOMQuadTag = b"T"                   # p1:Double, p2:Double, p3:Double, p4:Double
-    tag_kDOMMatrixTag = b"Y"                 # m11..m44: 16 Double
-    tag_kDOMMatrixReadOnlyTag = b"U"         # m11..m44: 16 Double
-    tag_kDOMMatrix2DTag = b"I"               # a..f: 6 Double
-    tag_kDOMMatrix2DReadOnlyTag = b"O"       # a..f: 6 Double
-    tag_kCryptoKeyTag = b"K"                 # subtag:byte, props, usages:uint32_t,
+    # filter_quality::uint32_t ->
+    # OffscreenCanvas. For OffscreenCanvas
+    # transfer
+    tag_kReadableStreamTransferTag = b"r"  # index:uint32_t
+    tag_kTransformStreamTransferTag = b"m"  # index:uint32_t
+    tag_kWritableStreamTransferTag = b"w"  # index:uint32_t
+    tag_kDOMPointTag = b"Q"  # x:Double, y:Double, z:Double, w:Double
+    tag_kDOMPointReadOnlyTag = b"W"  # x:Double, y:Double, z:Double, w:Double
+    tag_kDOMRectTag = b"E"  # x:Double, y:Double, width:Double, height:Double
+    tag_kDOMRectReadOnlyTag = b"R"  # x:Double, y:Double, width:Double, height:Double
+    tag_kDOMQuadTag = b"T"  # p1:Double, p2:Double, p3:Double, p4:Double
+    tag_kDOMMatrixTag = b"Y"  # m11..m44: 16 Double
+    tag_kDOMMatrixReadOnlyTag = b"U"  # m11..m44: 16 Double
+    tag_kDOMMatrix2DTag = b"I"  # a..f: 6 Double
+    tag_kDOMMatrix2DReadOnlyTag = b"O"  # a..f: 6 Double
+    tag_kCryptoKeyTag = b"K"  # subtag:byte, props, usages:uint32_t,
     # keyDataLength:uint32_t, keyData:byte[keyDataLength]
     #                 If subtag=AesKeyTag:
     #                     props = keyLengthBytes:uint32_t, algorithmId:uint32_t
@@ -137,7 +145,7 @@ class Constants:
     # pemCertificate:WebCoreString
     tag_kRTCEncodedAudioFrameTag = b"A"  # uint32_t -> transferred audio frame ID
     tag_kRTCEncodedVideoFrameTag = b"V"  # uint32_t -> transferred video frame ID
-    tag_kVideoFrameTag = b"v"            # uint32_t -> transferred video frame ID
+    tag_kVideoFrameTag = b"v"  # uint32_t -> transferred video frame ID
 
     # The following tags were used by the Shape Detection API implementation
     # between M71 and M81. During these milestones, the API was always behind
@@ -157,7 +165,9 @@ class BlinkV8Deserializer:
     def _read_file_index(self, stream: typing.BinaryIO) -> BlobIndex:
         return BlobIndex(BlobIndexType.File, self._read_varint(stream))
 
-    def _read_file_list_index(self, stream: typing.BinaryIO) -> typing.Iterable[BlobIndex]:
+    def _read_file_list_index(
+        self, stream: typing.BinaryIO
+    ) -> typing.Iterable[BlobIndex]:
         length = self._read_varint(stream)
         result = [self._read_file_index(stream) for _ in range(length)]
         return result
@@ -176,17 +186,29 @@ class BlinkV8Deserializer:
             Constants.tag_kFileTag: lambda x: self._not_implemented(x),
             Constants.tag_kFileIndexTag: lambda x: self._read_file_index(x),
             Constants.tag_kDOMFileSystemTag: lambda x: self._not_implemented(x),
-            Constants.tag_kNativeFileSystemFileHandleTag: lambda x: self._not_implemented(x),
-            Constants.tag_kNativeFileSystemDirectoryHandleTag: lambda x: self._not_implemented(x),
+            Constants.tag_kNativeFileSystemFileHandleTag: lambda x: self._not_implemented(
+                x
+            ),
+            Constants.tag_kNativeFileSystemDirectoryHandleTag: lambda x: self._not_implemented(
+                x
+            ),
             Constants.tag_kFileListTag: lambda x: self._not_implemented(x),
             Constants.tag_kFileListIndexTag: lambda x: self._read_file_list_index(x),
             Constants.tag_kImageDataTag: lambda x: self._not_implemented(x),
             Constants.tag_kImageBitmapTag: lambda x: self._not_implemented(x),
             Constants.tag_kImageBitmapTransferTag: lambda x: self._not_implemented(x),
-            Constants.tag_kOffscreenCanvasTransferTag: lambda x: self._not_implemented(x),
-            Constants.tag_kReadableStreamTransferTag: lambda x: self._not_implemented(x),
-            Constants.tag_kTransformStreamTransferTag: lambda x: self._not_implemented(x),
-            Constants.tag_kWritableStreamTransferTag: lambda x: self._not_implemented(x),
+            Constants.tag_kOffscreenCanvasTransferTag: lambda x: self._not_implemented(
+                x
+            ),
+            Constants.tag_kReadableStreamTransferTag: lambda x: self._not_implemented(
+                x
+            ),
+            Constants.tag_kTransformStreamTransferTag: lambda x: self._not_implemented(
+                x
+            ),
+            Constants.tag_kWritableStreamTransferTag: lambda x: self._not_implemented(
+                x
+            ),
             Constants.tag_kDOMPointTag: lambda x: self._not_implemented(x),
             Constants.tag_kDOMPointReadOnlyTag: lambda x: self._not_implemented(x),
             Constants.tag_kDOMRectTag: lambda x: self._not_implemented(x),
@@ -201,7 +223,7 @@ class BlinkV8Deserializer:
             Constants.tag_kRTCEncodedAudioFrameTag: lambda x: self._not_implemented(x),
             Constants.tag_kRTCEncodedVideoFrameTag: lambda x: self._not_implemented(x),
             Constants.tag_kVideoFrameTag: lambda x: self._not_implemented(x),
-            Constants.tag_kDOMExceptionTag: lambda x: self._not_implemented(x)
+            Constants.tag_kDOMExceptionTag: lambda x: self._not_implemented(x),
         }.get(tag)
 
         if func is None:
