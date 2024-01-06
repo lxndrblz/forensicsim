@@ -34,6 +34,8 @@ from bs4 import BeautifulSoup
 import shared
 import sys
 
+from dataclasses import dataclass, fields
+
 MESSAGE_TYPES = {
     "messages": {
         "creator",
@@ -77,6 +79,33 @@ MESSAGE_TYPES = {
         "type",
     },
 }
+
+
+@dataclass(init=False)
+class People:
+    # values
+    displayName: str | None = None
+    mri: str | None = None
+    email: str | None = None
+    userPrincipalName: str | None = None
+
+    # store + origin_file
+    origin_file: str | None = None
+    record_type: str = "people"
+
+    def __init__(self, **kwargs):
+        # allow to pass optional kwargs
+        # https://stackoverflow.com/a/54678706/5755604
+        names = set([f.name for f in fields(self)])
+        for k, v in kwargs.items():
+            if k in names:
+                setattr(self, k, v)
+
+    def __eq__(self, other):
+        return self.mri == other.mri
+
+    def __hash__(self):
+        return hash(("mri", self.mri))
 
 
 def map_updated_teams_keys(value):
@@ -135,22 +164,13 @@ def decode_and_loads(properties):
     return json.loads(properties)
 
 
-def parse_contacts(contacts):
-    cleaned = []
-    for contact in contacts:
-        try:
-            value = contact["value"]
-            x = extract_fields(value, "contact")
-            x["origin_file"] = contact["origin_file"]
-            x["record_type"] = "contact"
-            cleaned.append(x)
-        except UnicodeDecodeError or KeyError:
-            print("Could not decode contact.")
-
-    # Deduplicate based on mri - should be unique anyway
-    cleaned = deduplicate(cleaned, "mri")
-
-    return cleaned
+def parse_people(people):
+    cleaned_people = []
+    for rec in people:
+        kwargs = rec.get("value") | rec.get("origin_file")
+        c = People(**kwargs)
+        cleaned_people.add(c)
+    return set(cleaned_people)
 
 
 def parse_budies(buddylists):
@@ -312,13 +332,13 @@ def parse_records(records):
 
     # Parse the records based on the store they are in.
 
-    # parse contacts
-    contacts = [d for d in records if d["store"] == "people"]
-    parsed_records += parse_contacts(contacts)
+    # parse people
+    people = [d for d in records if d["store"] == "people"]
+    parsed_records += parse_people(people)
 
-    # parse contacts teams 2 personal aka buddies
-    contacts = [d for d in records if d["store"] == "buddylist"]
-    parsed_records += parse_budies(contacts)
+    # parse people teams 2 personal aka buddies
+    people = [d for d in records if d["store"] == "buddylist"]
+    parsed_records += parse_budies(people)
 
     # parse text messages, posts, call logs, file transfers
     reply_chains = [d for d in records if d["store"] == "replychains"]
