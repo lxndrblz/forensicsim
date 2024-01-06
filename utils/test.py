@@ -15,7 +15,9 @@ def main(args):
         print("\t---Object Stores---")
         for obj_store_name in db.object_store_names:
             obj_store = db[obj_store_name]
-            print(f"\tobject_store_id={obj_store.object_store_id}; name={obj_store.name}")
+            print(
+                f"\tobject_store_id={obj_store.object_store_id}; name={obj_store.name}"
+            )
             try:
                 one_record = next(obj_store.iterate_records())
             except StopIteration:
@@ -30,7 +32,7 @@ def main(args):
         print()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     if len(sys.argv) < 2:
         print(f"USAGE: {pathlib.Path(sys.argv[0]).name} <ldb dir path>")
         exit(1)

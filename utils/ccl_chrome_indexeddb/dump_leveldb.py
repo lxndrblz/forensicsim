@@ -18,26 +18,37 @@ def main(args):
         writes = csv.writer(file1, quoting=csv.QUOTE_ALL)
         writes.writerow(
             [
-                "key-hex", "key-text", "value-hex", "value-text", "origin_file",
-                "file_type", "offset", "seq", "state", "was_compressed"
-            ])
+                "key-hex",
+                "key-text",
+                "value-hex",
+                "value-text",
+                "origin_file",
+                "file_type",
+                "offset",
+                "seq",
+                "state",
+                "was_compressed",
+            ]
+        )
 
         for record in leveldb_records.iterate_records_raw():
-            writes.writerow([
-                record.user_key.hex(" ", 1),
-                record.user_key.decode(ENCODING, "replace"),
-                record.value.hex(" ", 1),
-                record.value.decode(ENCODING, "replace"),
-                str(record.origin_file),
-                record.file_type.name,
-                record.offset,
-                record.seq,
-                record.state.name,
-                record.was_compressed
-            ])
+            writes.writerow(
+                [
+                    record.user_key.hex(" ", 1),
+                    record.user_key.decode(ENCODING, "replace"),
+                    record.value.hex(" ", 1),
+                    record.value.decode(ENCODING, "replace"),
+                    str(record.origin_file),
+                    record.file_type.name,
+                    record.offset,
+                    record.seq,
+                    record.state.name,
+                    record.was_compressed,
+                ]
+            )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     if len(sys.argv) < 2:
         print(f"Usage: {pathlib.Path(sys.argv[0]).name} <indir path> [outpath.csv]")
         exit(1)

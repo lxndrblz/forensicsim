@@ -26,11 +26,20 @@ import io
 import json
 import os
 
-from ccl_chrome_indexeddb import ccl_blink_value_deserializer, ccl_chromium_indexeddb, ccl_v8_value_deserializer, \
-    ccl_leveldb, ccl_chromium_localstorage, ccl_chromium_sessionstorage
-from ccl_chrome_indexeddb.ccl_chromium_indexeddb import DatabaseMetadataType, ObjectStoreMetadataType
+from ccl_chrome_indexeddb import (
+    ccl_blink_value_deserializer,
+    ccl_chromium_indexeddb,
+    ccl_v8_value_deserializer,
+    ccl_leveldb,
+    ccl_chromium_localstorage,
+    ccl_chromium_sessionstorage,
+)
+from ccl_chrome_indexeddb.ccl_chromium_indexeddb import (
+    DatabaseMetadataType,
+    ObjectStoreMetadataType,
+)
 
-TEAMS_DB_OBJECT_STORES = ['replychains', 'conversations', 'people', 'buddylist']
+TEAMS_DB_OBJECT_STORES = ["replychains", "conversations", "people", "buddylist"]
 
 """
 The following code is heavily adopted from the RawLevelDb and IndexedDB processing proposed by CCL Group
@@ -65,8 +74,14 @@ class FastIndexedDB:
 
         for record in self._fetched_records:
             # Global Metadata
-            if record.key.startswith(b"\x00\x00\x00\x00") and record.state == ccl_leveldb.KeyState.Live:
-                if record.key not in global_metadata_raw or global_metadata_raw[record.key].seq < record.seq:
+            if (
+                record.key.startswith(b"\x00\x00\x00\x00")
+                and record.state == ccl_leveldb.KeyState.Live
+            ):
+                if (
+                    record.key not in global_metadata_raw
+                    or global_metadata_raw[record.key].seq < record.seq
+                ):
                     global_metadata_raw[record.key] = record
 
         # Convert the raw metadata to a nice GlobalMetadata Object
@@ -77,8 +92,10 @@ class FastIndexedDB:
             if None == db_id.dbid_no:
                 continue
 
-            if db_id.dbid_no > 0x7f:
-                raise NotImplementedError("there could be this many dbs, but I don't support it yet")
+            if db_id.dbid_no > 0x7F:
+                raise NotImplementedError(
+                    "there could be this many dbs, but I don't support it yet"
+                )
 
             # Database keys end with 0
             prefix_database = bytes([0, db_id.dbid_no, 0, 0])
@@ -87,39 +104,58 @@ class FastIndexedDB:
             prefix_objectstore = bytes([0, db_id.dbid_no, 0, 0, 50])
 
             for record in reversed(self._fetched_records):
-                if record.key.startswith(prefix_database) and record.state == ccl_leveldb.KeyState.Live:
+                if (
+                    record.key.startswith(prefix_database)
+                    and record.state == ccl_leveldb.KeyState.Live
+                ):
                     # we only want live keys and the newest version thereof (highest seq)
                     meta_type = record.key[len(prefix_database)]
                     old_version = database_metadata_raw.get((db_id.dbid_no, meta_type))
                     if old_version is None or old_version.seq < record.seq:
                         database_metadata_raw[(db_id.dbid_no, meta_type)] = record
-                if record.key.startswith(prefix_objectstore) and record.state == ccl_leveldb.KeyState.Live:
+                if (
+                    record.key.startswith(prefix_objectstore)
+                    and record.state == ccl_leveldb.KeyState.Live
+                ):
                     # we only want live keys and the newest version thereof (highest seq)
                     try:
-                        objstore_id, varint_raw = ccl_chromium_indexeddb.custom_le_varint_from_bytes(
-                            record.key[len(prefix_objectstore):])
+                        (
+                            objstore_id,
+                            varint_raw,
+                        ) = ccl_chromium_indexeddb.custom_le_varint_from_bytes(
+                            record.key[len(prefix_objectstore) :]
+                        )
                     except TypeError:
                         continue
 
                     meta_type = record.key[len(prefix_objectstore) + len(varint_raw)]
 
-                    old_version = objectstore_metadata_raw.get((db_id.dbid_no, objstore_id, meta_type))
+                    old_version = objectstore_metadata_raw.get(
+                        (db_id.dbid_no, objstore_id, meta_type)
+                    )
 
                     if old_version is None or old_version.seq < record.seq:
-                        objectstore_metadata_raw[(db_id.dbid_no, objstore_id, meta_type)] = record
+                        objectstore_metadata_raw[
+                            (db_id.dbid_no, objstore_id, meta_type)
+                        ] = record
 
         self.global_metadata = global_metadata
-        self.database_metadata = ccl_chromium_indexeddb.DatabaseMetadata(database_metadata_raw)
-        self.object_store_meta = ccl_chromium_indexeddb.ObjectStoreMetadata(objectstore_metadata_raw)
+        self.database_metadata = ccl_chromium_indexeddb.DatabaseMetadata(
+            database_metadata_raw
+        )
+        self.object_store_meta = ccl_chromium_indexeddb.ObjectStoreMetadata(
+            objectstore_metadata_raw
+        )
 
     def get_database_metadata(self, db_id: int, meta_type: DatabaseMetadataType):
         return self.database_metadata.get_meta(db_id, meta_type)
 
-    def get_object_store_metadata(self, db_id: int, obj_store_id: int, meta_type: ObjectStoreMetadataType):
+    def get_object_store_metadata(
+        self, db_id: int, obj_store_id: int, meta_type: ObjectStoreMetadataType
+    ):
         return self.object_store_meta.get_meta(db_id, obj_store_id, meta_type)
 
     def iterate_records(self, do_not_filter=False):
-
         blink_deserializer = ccl_blink_value_deserializer.BlinkV8Deserializer()
         # Loop through the databases and object stores based on their ids
         for global_id in self.global_metadata.db_ids:
@@ -128,11 +164,18 @@ class FastIndexedDB:
                 print(f"WARNING: Skipping database {global_id.name}")
                 continue
 
-            for object_store_id in range(1, self.database_metadata.get_meta(global_id.dbid_no,
-                                                                            DatabaseMetadataType.MaximumObjectStoreId) + 1):
-
-                datastore = self.object_store_meta.get_meta(global_id.dbid_no, object_store_id,
-                                                            ObjectStoreMetadataType.StoreName)
+            for object_store_id in range(
+                1,
+                self.database_metadata.get_meta(
+                    global_id.dbid_no, DatabaseMetadataType.MaximumObjectStoreId
+                )
+                + 1,
+            ):
+                datastore = self.object_store_meta.get_meta(
+                    global_id.dbid_no,
+                    object_store_id,
+                    ObjectStoreMetadataType.StoreName,
+                )
 
                 # print(f"\t Processing object store: {datastore}")
                 records_per_object_store = 0
@@ -142,18 +185,27 @@ class FastIndexedDB:
                         if record.key.startswith(prefix):
                             records_per_object_store += 1
                             # Skip records with empty values as these cant properly decoded
-                            if record.value == b'':
+                            if record.value == b"":
                                 continue
-                            value_version, varint_raw = ccl_chromium_indexeddb.custom_le_varint_from_bytes(record.value)
+                            (
+                                value_version,
+                                varint_raw,
+                            ) = ccl_chromium_indexeddb.custom_le_varint_from_bytes(
+                                record.value
+                            )
                             val_idx = len(varint_raw)
                             # read the blink envelope
                             blink_type_tag = record.value[val_idx]
-                            if blink_type_tag != 0xff:
+                            if blink_type_tag != 0xFF:
                                 print("Blink type tag not present")
                             val_idx += 1
 
-                            blink_version, varint_raw = ccl_chromium_indexeddb.custom_le_varint_from_bytes(
-                                record.value[val_idx:])
+                            (
+                                blink_version,
+                                varint_raw,
+                            ) = ccl_chromium_indexeddb.custom_le_varint_from_bytes(
+                                record.value[val_idx:]
+                            )
 
                             val_idx += len(varint_raw)
 
@@ -162,10 +214,18 @@ class FastIndexedDB:
                             try:
                                 # Initialize deserializer and try deserialization.
                                 deserializer = ccl_v8_value_deserializer.Deserializer(
-                                    obj_raw, host_object_delegate=blink_deserializer.read)
+                                    obj_raw,
+                                    host_object_delegate=blink_deserializer.read,
+                                )
                                 value = deserializer.read()
-                                yield {'key': record.key, 'value': value, 'origin_file': record.origin_file,
-                                       'store': datastore, 'state': record.state, 'seq': record.seq}
+                                yield {
+                                    "key": record.key,
+                                    "value": value,
+                                    "origin_file": record.origin_file,
+                                    "store": datastore,
+                                    "state": record.state,
+                                    "seq": record.seq,
+                                }
                             except Exception as e:
                                 # TODO Some proper error handling wouldn't hurt
                                 continue
@@ -203,8 +263,12 @@ def parse_sessionstorage(filepath):
                 # response is of type SessionStoreValue
 
                 # Make a nice dictionary out of it
-                entry = {'key': host, 'value': session_store_value.value, 'guid': session_store_value.guid,
-                         'leveldb_sequence_number': session_store_value.leveldb_sequence_number}
+                entry = {
+                    "key": host,
+                    "value": session_store_value.value,
+                    "guid": session_store_value.guid,
+                    "leveldb_sequence_number": session_store_value.leveldb_sequence_number,
+                }
                 extracted_values.append(entry)
     return extracted_values
 
@@ -212,8 +276,10 @@ def parse_sessionstorage(filepath):
 def write_results_to_json(data, outputpath):
     # Dump messages into a json file
     try:
-        with open(outputpath, 'w', encoding='utf-8') as f:
-            json.dump(data, f, indent=4, sort_keys=True, default=str, ensure_ascii=False)
+        with open(outputpath, "w", encoding="utf-8") as f:
+            json.dump(
+                data, f, indent=4, sort_keys=True, default=str, ensure_ascii=False
+            )
     except EnvironmentError as e:
         print(e)
 
@@ -221,7 +287,7 @@ def write_results_to_json(data, outputpath):
 def parse_json():
     # read data from a file. This is only for testing purpose.
     try:
-        with open('teams.json') as json_file:
+        with open("teams.json") as json_file:
             data = json.load(json_file)
             return data
     except EnvironmentError as e:

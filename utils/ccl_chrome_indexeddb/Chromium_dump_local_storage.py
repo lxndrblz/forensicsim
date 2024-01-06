@@ -85,8 +85,13 @@ def main(args):
     for batch in local_storage.iter_batches():
         cur.execute(
             INSERT_BATCH_SQL,
-            (batch.start, batch.end, storage_keys_lookup[batch.storage_key],
-             batch.timestamp.replace(tzinfo=datetime.timezone.utc).timestamp()))
+            (
+                batch.start,
+                batch.end,
+                storage_keys_lookup[batch.storage_key],
+                batch.timestamp.replace(tzinfo=datetime.timezone.utc).timestamp(),
+            ),
+        )
 
     for record in local_storage.iter_all_records():
         batch = local_storage.find_batch(record.leveldb_seq_number)
@@ -94,9 +99,12 @@ def main(args):
         cur.execute(
             INSERT_RECORD_SQL,
             (
-                storage_keys_lookup[record.storage_key], record.script_key, record.value,
-                batch_id, record.leveldb_seq_number
-            )
+                storage_keys_lookup[record.storage_key],
+                record.script_key,
+                record.value,
+                batch_id,
+                record.leveldb_seq_number,
+            ),
         )
 
     cur.close()
@@ -104,7 +112,7 @@ def main(args):
     out_db.close()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     if len(sys.argv) != 3:
         print(f"{pathlib.Path(sys.argv[0]).name} <leveldb dir> <out.db>")
         exit(1)

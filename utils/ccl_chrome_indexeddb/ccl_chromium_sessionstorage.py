@@ -99,8 +99,11 @@ class SessionStoreDb:
                     if not map_id:
                         continue  # TODO: investigate why this happens/do we want to keep the host around somewhere?
 
-                    #if map_id in self._map_id_to_host_guid and self._map_id_to_host_guid[map_id] != guid_host_pair:
-                    if map_id in self._map_id_to_host and self._map_id_to_host[map_id] != host:
+                    # if map_id in self._map_id_to_host_guid and self._map_id_to_host_guid[map_id] != guid_host_pair:
+                    if (
+                        map_id in self._map_id_to_host
+                        and self._map_id_to_host[map_id] != host
+                    ):
                         print("Map ID Collision!")
                         print(f"map_id: {map_id}")
                         print(f"Old host: {self._map_id_to_host[map_id]}")
@@ -145,16 +148,20 @@ class SessionStoreDb:
                     print(f"Raw Value: {rec.value}")
                     continue
 
-                #guid_host_pair = self._map_id_to_host_guid.get(map_id)
+                # guid_host_pair = self._map_id_to_host_guid.get(map_id)
                 host = self._map_id_to_host.get(map_id)
-                #if not guid_host_pair:
+                # if not guid_host_pair:
                 if not host:
-                    self._orphans.append((ss_key, SessionStoreValue(value, None, rec.seq)))
+                    self._orphans.append(
+                        (ss_key, SessionStoreValue(value, None, rec.seq))
+                    )
                 else:
-                    #guid, host = guid_host_pair
+                    # guid, host = guid_host_pair
                     self._host_lookup.setdefault(host, {})
                     self._host_lookup[host].setdefault(ss_key, [])
-                    self._host_lookup[host][ss_key].append(SessionStoreValue(value, None, rec.seq))
+                    self._host_lookup[host][ss_key].append(
+                        SessionStoreValue(value, None, rec.seq)
+                    )
 
     def __contains__(self, item: typing.Union[str, typing.Tuple[str, str]]) -> bool:
         """if item is a str, returns true if that host is present
@@ -213,5 +220,6 @@ def main(args):
     for host in ssdb:
         print(host)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main(sys.argv[1:])

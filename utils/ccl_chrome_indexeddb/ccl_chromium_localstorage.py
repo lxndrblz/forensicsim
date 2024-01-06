@@ -52,6 +52,7 @@ _CHROME_EPOCH = datetime.datetime(1601, 1, 1, 0, 0, 0)
 
 EIGHT_BIT_ENCODING = "iso-8859-1"
 
+
 def from_chrome_timestamp(microseconds: int) -> datetime.datetime:
     return _CHROME_EPOCH + datetime.timedelta(microseconds=microseconds)
 
@@ -84,12 +85,16 @@ class StorageMetadata:
             # This is a simple protobuff, so we'll read it directly, but with checks, rather than add a dependency
             ts_tag = ccl_leveldb.read_le_varint(stream)
             if (ts_tag & 0x07) != 0 or (ts_tag >> 3) != 1:
-                raise ValueError("Unexpected tag when reading StorageMetadata from protobuff")
+                raise ValueError(
+                    "Unexpected tag when reading StorageMetadata from protobuff"
+                )
             timestamp = from_chrome_timestamp(ccl_leveldb.read_le_varint(stream))
 
             size_tag = ccl_leveldb.read_le_varint(stream)
             if (size_tag & 0x07) != 0 or (size_tag >> 3) != 2:
-                raise ValueError("Unexpected tag when reading StorageMetadata from protobuff")
+                raise ValueError(
+                    "Unexpected tag when reading StorageMetadata from protobuff"
+                )
             size = ccl_leveldb.read_le_varint(stream)
 
             return cls(storage_key, timestamp, size, seq)
@@ -137,43 +142,65 @@ class LocalStoreDb:
         self._ldb = ccl_leveldb.RawLevelDb(in_dir)
 
         self._storage_details = {}  # storage_key: {seq_number: StorageMetadata}
-        self._flat_items = []       # [StorageMetadata|LocalStorageRecord]   - used to batch items up
-        self._records = {}          # storage_key: {script_key: {seq_number: LocalStorageRecord}}
+        self._flat_items = []  # [StorageMetadata|LocalStorageRecord]   - used to batch items up
+        self._records = {}  # storage_key: {script_key: {seq_number: LocalStorageRecord}}
 
         for record in self._ldb.iterate_records_raw():
-            if record.user_key.startswith(_META_PREFIX) and record.state == ccl_leveldb.KeyState.Live:
+            if (
+                record.user_key.startswith(_META_PREFIX)
+                and record.state == ccl_leveldb.KeyState.Live
+            ):
                 # Only live records for metadata - not sure what we can reliably infer from deleted keys
-                storage_key = record.user_key.removeprefix(_META_PREFIX).decode(EIGHT_BIT_ENCODING)
+                storage_key = record.user_key.removeprefix(_META_PREFIX).decode(
+                    EIGHT_BIT_ENCODING
+                )
                 self._storage_details.setdefault(storage_key, {})
-                metadata = StorageMetadata.from_protobuff(storage_key, record.value, record.seq)
+                metadata = StorageMetadata.from_protobuff(
+                    storage_key, record.value, record.seq
+                )
                 self._storage_details[storage_key][record.seq] = metadata
                 self._flat_items.append(metadata)
             elif record.user_key.startswith(_RECORD_KEY_PREFIX):
                 # We include deleted records here because we need them to build batches
-                storage_key_raw, script_key_raw = record.user_key.removeprefix(_RECORD_KEY_PREFIX).split(b"\x00", 1)
+                storage_key_raw, script_key_raw = record.user_key.removeprefix(
+                    _RECORD_KEY_PREFIX
+                ).split(b"\x00", 1)
                 storage_key = storage_key_raw.decode(EIGHT_BIT_ENCODING)
                 script_key = decode_string(script_key_raw)
 
                 try:
-                    value = decode_string(record.value) if record.state == ccl_leveldb.KeyState.Live else None
+                    value = (
+                        decode_string(record.value)
+                        if record.state == ccl_leveldb.KeyState.Live
+                        else None
+                    )
                 except UnicodeDecodeError as e:
                     # Some sites play games to test the browser's capabilities like encoding half of a surrogate pair
-                    print(f"Error decoding record value at seq no {record.seq}; "
-                          f"{storage_key} {script_key}:  {record.value}")
+                    print(
+                        f"Error decoding record value at seq no {record.seq}; "
+                        f"{storage_key} {script_key}:  {record.value}"
+                    )
                     continue
 
                 self._records.setdefault(storage_key, {})
                 self._records[storage_key].setdefault(script_key, {})
 
                 ls_record = LocalStorageRecord(
-                    storage_key, script_key, value, record.seq, record.state == ccl_leveldb.KeyState.Live)
+                    storage_key,
+                    script_key,
+                    value,
+                    record.seq,
+                    record.state == ccl_leveldb.KeyState.Live,
+                )
                 self._records[storage_key][script_key][record.seq] = ls_record
                 self._flat_items.append(ls_record)
 
         self._storage_details = types.MappingProxyType(self._storage_details)
         self._records = types.MappingProxyType(self._records)
 
-        self._all_storage_keys = frozenset(self._storage_details.keys() | self._records.keys())  # because deleted data.
+        self._all_storage_keys = frozenset(
+            self._storage_details.keys() | self._records.keys()
+        )  # because deleted data.
         self._flat_items.sort(key=lambda x: x.leveldb_seq_number)
 
         # organise batches - this is made complex and slow by having to account for missing/deleted data
@@ -188,9 +215,14 @@ class LocalStoreDb:
                 if current_meta is None:
                     # no currently valid metadata so we can't attribute this record to anything
                     continue
-                elif item.leveldb_seq_number - current_end != 1 or item.storage_key != current_meta.storage_key:
+                elif (
+                    item.leveldb_seq_number - current_end != 1
+                    or item.storage_key != current_meta.storage_key
+                ):
                     # this record breaks a chain, so bundle up what we have and clear everything out
-                    self._batches[current_meta.leveldb_seq_number] = LocalStorageBatch(current_meta, current_end)
+                    self._batches[current_meta.leveldb_seq_number] = LocalStorageBatch(
+                        current_meta, current_end
+                    )
                     current_meta = None
                     current_end = 0
                 else:
@@ -199,14 +231,18 @@ class LocalStoreDb:
             elif isinstance(item, StorageMetadata):
                 if current_meta is not None:
                     # this record breaks a chain, so bundle up what we have, set new start
-                    self._batches[current_meta.leveldb_seq_number] = LocalStorageBatch(current_meta, current_end)
+                    self._batches[current_meta.leveldb_seq_number] = LocalStorageBatch(
+                        current_meta, current_end
+                    )
                 current_meta = item
                 current_end = item.leveldb_seq_number
             else:
                 raise ValueError
 
         if current_meta is not None:
-            self._batches[current_meta.leveldb_seq_number] = LocalStorageBatch(current_meta, current_end)
+            self._batches[current_meta.leveldb_seq_number] = LocalStorageBatch(
+                current_meta, current_end
+            )
 
         self._batch_starts = tuple(sorted(self._batches.keys()))
 
@@ -253,7 +289,9 @@ class LocalStoreDb:
                     if value.is_live:
                         yield value
 
-    def iter_records_for_storage_key(self, storage_key) -> typing.Iterable[LocalStorageRecord]:
+    def iter_records_for_storage_key(
+        self, storage_key
+    ) -> typing.Iterable[LocalStorageRecord]:
         """
         :param storage_key: storage key (host) for the records
         :return: iterable of LocalStorageRecords
@@ -265,7 +303,9 @@ class LocalStoreDb:
                 if value.is_live:
                     yield value
 
-    def iter_records_for_script_key(self, storage_key, script_key) -> typing.Iterable[LocalStorageRecord]:
+    def iter_records_for_script_key(
+        self, storage_key, script_key
+    ) -> typing.Iterable[LocalStorageRecord]:
         """
         :param storage_key: storage key (host) for the records
         :param script_key: script defined key for the records
@@ -285,7 +325,9 @@ class LocalStoreDb:
             if isinstance(meta, StorageMetadata):
                 yield meta
 
-    def iter_metadata_for_storage_key(self, storage_key: str) -> typing.Iterable[StorageMetadata]:
+    def iter_metadata_for_storage_key(
+        self, storage_key: str
+    ) -> typing.Iterable[StorageMetadata]:
         """
         :param storage_key: storage key (host) for the metadata
         :return: iterable of StorageMetadata
@@ -313,5 +355,5 @@ def main(args):
         print(rec, batch)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main(sys.argv[1:])

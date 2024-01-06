@@ -37,7 +37,9 @@ __description__ = "A module for reading LevelDB databases"
 __contact__ = "Alex Caithness"
 
 
-def _read_le_varint(stream: typing.BinaryIO, *, is_google_32bit=False) -> typing.Optional[typing.Tuple[int, bytes]]:
+def _read_le_varint(
+    stream: typing.BinaryIO, *, is_google_32bit=False
+) -> typing.Optional[typing.Tuple[int, bytes]]:
     """Read varint from a stream.
     If the read is successful: returns a tuple of the (unsigned) value and the raw bytes making up that varint,
     otherwise returns None.
@@ -51,16 +53,18 @@ def _read_le_varint(stream: typing.BinaryIO, *, is_google_32bit=False) -> typing
         raw = stream.read(1)
         if len(raw) < 1:
             return None
-        tmp, = raw
+        (tmp,) = raw
         underlying_bytes.append(tmp)
-        result |= ((tmp & 0x7f) << (i * 7))
+        result |= (tmp & 0x7F) << (i * 7)
         if (tmp & 0x80) == 0:
             break
         i += 1
     return result, bytes(underlying_bytes)
 
 
-def read_le_varint(stream: typing.BinaryIO, *, is_google_32bit=False) -> typing.Optional[int]:
+def read_le_varint(
+    stream: typing.BinaryIO, *, is_google_32bit=False
+) -> typing.Optional[int]:
     """Convenience version of _read_le_varint that only returns the value or None"""
     x = _read_le_varint(stream, is_google_32bit=is_google_32bit)
     if x is None:
@@ -81,6 +85,7 @@ def read_length_prefixed_blob(stream: typing.BinaryIO):
 class BlockHandle:
     """See: https://github.com/google/leveldb/blob/master/doc/table_format.md
     A BlockHandle contains an offset and length of a block in an ldb table file"""
+
     offset: int
     length: int
 
@@ -98,6 +103,7 @@ class BlockHandle:
 class RawBlockEntry:
     """Raw key, value for a record in a LDB file Block, along with the offset within the block from which it came from
     See: https://github.com/google/leveldb/blob/master/doc/table_format.md"""
+
     key: bytes
     value: bytes
     block_offset: int
@@ -137,37 +143,56 @@ class Record:
         else:
             return self.key
 
-
     @classmethod
-    def ldb_record(cls, key: bytes, value: bytes, origin_file: os.PathLike,
-                   offset: int, was_compressed: bool):
+    def ldb_record(
+        cls,
+        key: bytes,
+        value: bytes,
+        origin_file: os.PathLike,
+        offset: int,
+        was_compressed: bool,
+    ):
         seq = (struct.unpack("<Q", key[-8:])[0]) >> 8
         if len(key) > 8:
             state = KeyState.Deleted if key[-8] == 0 else KeyState.Live
         else:
             state = KeyState.Unknown
-        return cls(key, value, seq, state, FileType.Ldb, origin_file, offset, was_compressed)
+        return cls(
+            key, value, seq, state, FileType.Ldb, origin_file, offset, was_compressed
+        )
 
     @classmethod
-    def log_record(cls, key: bytes, value: bytes, seq: int, state: KeyState,
-                   origin_file: os.PathLike, offset: int):
+    def log_record(
+        cls,
+        key: bytes,
+        value: bytes,
+        seq: int,
+        state: KeyState,
+        origin_file: os.PathLike,
+        offset: int,
+    ):
         return cls(key, value, seq, state, FileType.Log, origin_file, offset, False)
 
 
 class Block:
     """Block from an .lldb (table) file. See: https://github.com/google/leveldb/blob/master/doc/table_format.md"""
-    def __init__(self, raw: bytes, was_compressed: bool, origin: "LdbFile", offset: int):
+
+    def __init__(
+        self, raw: bytes, was_compressed: bool, origin: "LdbFile", offset: int
+    ):
         self._raw = raw
         self.was_compressed = was_compressed
         self.origin = origin
         self.offset = offset
 
-        self._restart_array_count, = struct.unpack("<I", self._raw[-4:])
-        self._restart_array_offset = len(self._raw) - (self._restart_array_count + 1) * 4
+        (self._restart_array_count,) = struct.unpack("<I", self._raw[-4:])
+        self._restart_array_offset = (
+            len(self._raw) - (self._restart_array_count + 1) * 4
+        )
 
     def get_restart_offset(self, index) -> int:
         offset = self._restart_array_offset + (index * 4)
-        return struct.unpack("<i", self._raw[offset: offset + 4])[0]
+        return struct.unpack("<i", self._raw[offset : offset + 4])[0]
 
     def get_first_entry_offset(self) -> int:
         return self.get_restart_offset(0)
@@ -187,9 +212,13 @@ class Block:
 
                 # sense check
                 if offset >= self._restart_array_offset:
-                    raise ValueError("Reading start of entry past the start of restart array")
+                    raise ValueError(
+                        "Reading start of entry past the start of restart array"
+                    )
                 if shared_length > len(key):
-                    raise ValueError("Shared key length is larger than the previous key")
+                    raise ValueError(
+                        "Shared key length is larger than the previous key"
+                    )
 
                 key = key[:shared_length] + buff.read(non_shared_length)
                 value = buff.read(value_length)
@@ -199,9 +228,10 @@ class Block:
 
 class LdbFile:
     """A leveldb table (.ldb or .sst) file."""
+
     BLOCK_TRAILER_SIZE = 5
     FOOTER_SIZE = 48
-    MAGIC = 0xdb4775248b80fb57
+    MAGIC = 0xDB4775248B80FB57
 
     def __init__(self, file: pathlib.Path):
         if not file.exists():
@@ -216,7 +246,7 @@ class LdbFile:
         self._meta_index_handle = BlockHandle.from_stream(self._f)
         self._index_handle = BlockHandle.from_stream(self._f)
         self._f.seek(-8, os.SEEK_END)
-        magic, = struct.unpack("<Q", self._f.read(8))
+        (magic,) = struct.unpack("<Q", self._f.read(8))
         if magic != LdbFile.MAGIC:
             raise ValueError(f"Invalid magic number in {file}")
 
@@ -233,8 +263,13 @@ class LdbFile:
         raw_block = self._f.read(handle.length)
         trailer = self._f.read(LdbFile.BLOCK_TRAILER_SIZE)
 
-        if len(raw_block) != handle.length or len(trailer) != LdbFile.BLOCK_TRAILER_SIZE:
-            raise ValueError(f"Could not read all of the block at offset {handle.offset} in file {self.path}")
+        if (
+            len(raw_block) != handle.length
+            or len(trailer) != LdbFile.BLOCK_TRAILER_SIZE
+        ):
+            raise ValueError(
+                f"Could not read all of the block at offset {handle.offset} in file {self.path}"
+            )
 
         is_compressed = trailer[0] != 0
         if is_compressed:
@@ -246,8 +281,9 @@ class LdbFile:
     def _read_index(self) -> typing.Tuple[typing.Tuple[bytes, BlockHandle], ...]:
         index_block = self._read_block(self._index_handle)
         # key is earliest key, value is BlockHandle to that data block
-        return tuple((entry.key, BlockHandle.from_bytes(entry.value))
-                     for entry in index_block)
+        return tuple(
+            (entry.key, BlockHandle.from_bytes(entry.value)) for entry in index_block
+        )
 
     def __iter__(self) -> typing.Iterable[Record]:
         """Iterate Records in this Table file"""
@@ -255,9 +291,14 @@ class LdbFile:
             block = self._read_block(handle)
             for entry in block:
                 yield Record.ldb_record(
-                    entry.key, entry.value, self.path,
-                    block.offset if block.was_compressed else block.offset + entry.block_offset,
-                    block.was_compressed)
+                    entry.key,
+                    entry.value,
+                    self.path,
+                    block.offset
+                    if block.was_compressed
+                    else block.offset + entry.block_offset,
+                    block.was_compressed,
+                )
 
     def close(self):
         self._f.close()
@@ -273,6 +314,7 @@ class LogEntryType(enum.IntEnum):
 
 class LogFile:
     """A levelDb log (.log) file"""
+
     LOG_ENTRY_HEADER_SIZE = 7
     LOG_BLOCK_SIZE = 32768
 
@@ -305,26 +347,37 @@ class LogFile:
 
                     if block_type == LogEntryType.Full:
                         if in_record:
-                            raise ValueError(f"Full block whilst still building a block at offset "
-                                             f"{idx * LogFile.LOG_BLOCK_SIZE + buff.tell()} in {self.path}")
+                            raise ValueError(
+                                f"Full block whilst still building a block at offset "
+                                f"{idx * LogFile.LOG_BLOCK_SIZE + buff.tell()} in {self.path}"
+                            )
                         in_record = False
-                        yield idx * LogFile.LOG_BLOCK_SIZE + buff.tell(), buff.read(length)
+                        yield (
+                            idx * LogFile.LOG_BLOCK_SIZE + buff.tell(),
+                            buff.read(length),
+                        )
                     elif block_type == LogEntryType.First:
                         if in_record:
-                            raise ValueError(f"First block whilst still building a block at offset "
-                                             f"{idx * LogFile.LOG_BLOCK_SIZE + buff.tell()} in {self.path}")
+                            raise ValueError(
+                                f"First block whilst still building a block at offset "
+                                f"{idx * LogFile.LOG_BLOCK_SIZE + buff.tell()} in {self.path}"
+                            )
                         start_block_offset = idx * LogFile.LOG_BLOCK_SIZE + buff.tell()
                         block = buff.read(length)
                         in_record = True
                     elif block_type == LogEntryType.Middle:
                         if not in_record:
-                            raise ValueError(f"Middle block whilst not building a block at offset "
-                                             f"{idx * LogFile.LOG_BLOCK_SIZE + buff.tell()} in {self.path}")
+                            raise ValueError(
+                                f"Middle block whilst not building a block at offset "
+                                f"{idx * LogFile.LOG_BLOCK_SIZE + buff.tell()} in {self.path}"
+                            )
                         block += buff.read(length)
                     elif block_type == LogEntryType.Last:
                         if not in_record:
-                            raise ValueError(f"Last block whilst not building a block at offset "
-                                             f"{idx * LogFile.LOG_BLOCK_SIZE + buff.tell()} in {self.path}")
+                            raise ValueError(
+                                f"Last block whilst not building a block at offset "
+                                f"{idx * LogFile.LOG_BLOCK_SIZE + buff.tell()} in {self.path}"
+                            )
                         block += buff.read(length)
                         in_record = False
                         yield start_block_offset * LogFile.LOG_BLOCK_SIZE, block
@@ -363,7 +416,9 @@ class LogFile:
                     else:
                         value = b""
 
-                    yield Record.log_record(key, value, seq + i, state, self.path, start_offset)
+                    yield Record.log_record(
+                        key, value, seq + i, state, self.path, start_offset
+                    )
 
     def close(self):
         self._f.close()
@@ -373,13 +428,14 @@ class VersionEditTag(enum.IntEnum):
     """
     See: https://github.com/google/leveldb/blob/master/db/version_edit.cc
     """
-    Comparator = 1,
-    LogNumber = 2,
-    NextFileNumber = 3,
-    LastSequence = 4,
-    CompactPointer = 5,
-    DeletedFile = 6,
-    NewFile = 7,
+
+    Comparator = (1,)
+    LogNumber = (2,)
+    NextFileNumber = (3,)
+    LastSequence = (4,)
+    CompactPointer = (5,)
+    DeletedFile = (6,)
+    NewFile = (7,)
     # 8 was used for large value refs
     PrevLogNumber = 9
 
@@ -391,6 +447,7 @@ class VersionEdit:
     https://github.com/google/leveldb/blob/master/db/version_edit.h
     https://github.com/google/leveldb/blob/master/db/version_edit.cc
     """
+
     comparator: str = None
     log_number: int = None
     prev_log_number: int = None
@@ -413,7 +470,9 @@ class VersionEdit:
 
         compaction_pointer_nt = namedtuple("CompactionPointer", ["level", "pointer"])
         deleted_file_nt = namedtuple("DeletedFile", ["level", "file_no"])
-        new_file_nt = namedtuple("NewFile", ["level", "file_no", "file_size", "smallest_key", "largest_key"])
+        new_file_nt = namedtuple(
+            "NewFile", ["level", "file_no", "file_size", "smallest_key", "largest_key"]
+        )
 
         with io.BytesIO(buffer) as b:
             while b.tell() < len(buffer) - 1:
@@ -432,7 +491,9 @@ class VersionEdit:
                 elif tag == VersionEditTag.CompactPointer:
                     level = read_le_varint(b, is_google_32bit=True)
                     compaction_pointer = read_length_prefixed_blob(b)
-                    compaction_pointers.append(compaction_pointer_nt(level, compaction_pointer))
+                    compaction_pointers.append(
+                        compaction_pointer_nt(level, compaction_pointer)
+                    )
                 elif tag == VersionEditTag.DeletedFile:
                     level = read_le_varint(b, is_google_32bit=True)
                     file_no = read_le_varint(b)
@@ -443,10 +504,20 @@ class VersionEdit:
                     file_size = read_le_varint(b)
                     smallest = read_length_prefixed_blob(b)
                     largest = read_length_prefixed_blob(b)
-                    new_files.append(new_file_nt(level, file_no, file_size, smallest, largest))
+                    new_files.append(
+                        new_file_nt(level, file_no, file_size, smallest, largest)
+                    )
 
-        return cls(comparator, log_number, prev_log_number, last_sequence, next_file_number, tuple(compaction_pointers),
-            tuple(deleted_files), tuple(new_files))
+        return cls(
+            comparator,
+            log_number,
+            prev_log_number,
+            last_sequence,
+            next_file_number,
+            tuple(compaction_pointers),
+            tuple(deleted_files),
+            tuple(new_files),
+        )
 
 
 class ManifestFile:
@@ -501,26 +572,37 @@ class ManifestFile:
 
                     if block_type == LogEntryType.Full:
                         if in_record:
-                            raise ValueError(f"Full block whilst still building a block at offset "
-                                             f"{idx * LogFile.LOG_BLOCK_SIZE + buff.tell()} in {self.path}")
+                            raise ValueError(
+                                f"Full block whilst still building a block at offset "
+                                f"{idx * LogFile.LOG_BLOCK_SIZE + buff.tell()} in {self.path}"
+                            )
                         in_record = False
-                        yield idx * LogFile.LOG_BLOCK_SIZE + buff.tell(), buff.read(length)
+                        yield (
+                            idx * LogFile.LOG_BLOCK_SIZE + buff.tell(),
+                            buff.read(length),
+                        )
                     elif block_type == LogEntryType.First:
                         if in_record:
-                            raise ValueError(f"First block whilst still building a block at offset "
-                                             f"{idx * LogFile.LOG_BLOCK_SIZE + buff.tell()} in {self.path}")
+                            raise ValueError(
+                                f"First block whilst still building a block at offset "
+                                f"{idx * LogFile.LOG_BLOCK_SIZE + buff.tell()} in {self.path}"
+                            )
                         start_block_offset = idx * LogFile.LOG_BLOCK_SIZE + buff.tell()
                         block = buff.read(length)
                         in_record = True
                     elif block_type == LogEntryType.Middle:
                         if not in_record:
-                            raise ValueError(f"Middle block whilst not building a block at offset "
-                                             f"{idx * LogFile.LOG_BLOCK_SIZE + buff.tell()} in {self.path}")
+                            raise ValueError(
+                                f"Middle block whilst not building a block at offset "
+                                f"{idx * LogFile.LOG_BLOCK_SIZE + buff.tell()} in {self.path}"
+                            )
                         block += buff.read(length)
                     elif block_type == LogEntryType.Last:
                         if not in_record:
-                            raise ValueError(f"Last block whilst not building a block at offset "
-                                             f"{idx * LogFile.LOG_BLOCK_SIZE + buff.tell()} in {self.path}")
+                            raise ValueError(
+                                f"Last block whilst not building a block at offset "
+                                f"{idx * LogFile.LOG_BLOCK_SIZE + buff.tell()} in {self.path}"
+                            )
                         block += buff.read(length)
                         in_record = False
                         yield start_block_offset * LogFile.LOG_BLOCK_SIZE, block
@@ -539,7 +621,6 @@ class RawLevelDb:
     DATA_FILE_PATTERN = r"[0-9]{6}\.(ldb|log|sst)"
 
     def __init__(self, in_dir: os.PathLike):
-
         self._in_dir = pathlib.Path(in_dir)
         if not self._in_dir.is_dir():
             raise ValueError("in_dir is not a directory")
@@ -552,12 +633,21 @@ class RawLevelDb:
                     self._files.append(LogFile(file))
                 elif file.suffix.lower() == ".ldb" or file.suffix.lower() == ".sst":
                     self._files.append(LdbFile(file))
-            if file.is_file() and re.match(ManifestFile.MANIFEST_FILENAME_PATTERN, file.name):
-                manifest_no = int(re.match(ManifestFile.MANIFEST_FILENAME_PATTERN, file.name).group(1), 16)
+            if file.is_file() and re.match(
+                ManifestFile.MANIFEST_FILENAME_PATTERN, file.name
+            ):
+                manifest_no = int(
+                    re.match(ManifestFile.MANIFEST_FILENAME_PATTERN, file.name).group(
+                        1
+                    ),
+                    16,
+                )
                 if latest_manifest[0] < manifest_no:
                     latest_manifest = (manifest_no, file)
 
-        self.manifest = ManifestFile(latest_manifest[1]) if latest_manifest[1] is not None else None
+        self.manifest = (
+            ManifestFile(latest_manifest[1]) if latest_manifest[1] is not None else None
+        )
 
     def __enter__(self):
         return self
@@ -570,7 +660,9 @@ class RawLevelDb:
         return self._in_dir
 
     def iterate_records_raw(self, *, reverse=False) -> typing.Iterable[Record]:
-        for file_containing_records in sorted(self._files, reverse=reverse, key=lambda x: x.file_no):
+        for file_containing_records in sorted(
+            self._files, reverse=reverse, key=lambda x: x.file_no
+        ):
             yield from file_containing_records
 
     def close(self):

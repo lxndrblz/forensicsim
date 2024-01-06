@@ -9,19 +9,28 @@ import pyfiglet
 from pywinauto import Desktop, keyboard
 from pywinauto.application import Application
 
-logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', filename='data_population_skype.log',
-                    level=logging.DEBUG)
+logging.basicConfig(
+    format="%(asctime)s %(message)s",
+    datefmt="%m/%d/%Y %I:%M:%S %p",
+    filename="data_population_skype.log",
+    level=logging.DEBUG,
+)
 
 # Lets assume Skype is not running
-skype_window = Application(backend='uia').start(
-    r"C:\Program Files (x86)\Microsoft\Skype for Desktop\skype.exe").connect(title='Skype', timeout=100)
+skype_window = (
+    Application(backend="uia")
+    .start(r"C:\Program Files (x86)\Microsoft\Skype for Desktop\skype.exe")
+    .connect(title="Skype", timeout=100)
+)
 # Wait until load screen passes
 time.sleep(10)
 
 
 def select_chat_channel(contact):
     # Select contact from sidebar
-    chat = skype_window.Skype.child_window(title=contact, control_type="Text").wrapper_object()
+    chat = skype_window.Skype.child_window(
+        title=contact, control_type="Text"
+    ).wrapper_object()
     chat.click_input()
 
 
@@ -29,18 +38,21 @@ def react_to_last_message():
     # Ensure the chat is fully loaded
     time.sleep(5)
     # Like only the last Message
-    react_buttons = skype_window.Skype.descendants(title="React to this message", control_type="Button")
+    react_buttons = skype_window.Skype.descendants(
+        title="React to this message", control_type="Button"
+    )
     react_button = react_buttons[-1]
     react_button.click_input()
     time.sleep(2)
     # Like Response
-    like_button = skype_window.Skype.child_window(title="Crying", control_type="Button").wrapper_object()
+    like_button = skype_window.Skype.child_window(
+        title="Crying", control_type="Button"
+    ).wrapper_object()
     like_button.click()
-    logging.info('Reacted with Like to last message')
+    logging.info("Reacted with Like to last message")
 
 
 def remove_last_message(title):
-
     time.sleep(5)
     # skype_window.Skype.print_control_identifiers()
     # Select the last text message with a matching title
@@ -51,41 +63,51 @@ def remove_last_message(title):
     text_box.click_input(button="right")
     time.sleep(3)
     # Click on the remove menu
-    remove_button = skype_window.Skype.child_window(title="Remove", control_type="MenuItem").wrapper_object()
+    remove_button = skype_window.Skype.child_window(
+        title="Remove", control_type="MenuItem"
+    ).wrapper_object()
     remove_button.click_input()
     # Click remove once more to confirm
-    remove_button_confirm = skype_window.Skype.child_window(title="Remove", control_type="Text").wrapper_object()
+    remove_button_confirm = skype_window.Skype.child_window(
+        title="Remove", control_type="Text"
+    ).wrapper_object()
     remove_button_confirm.click_input()
-    logging.info('Removed last message')
+    logging.info("Removed last message")
 
 
 def send_text_message(message):
-    message_box = skype_window.Skype.child_window(title="Type a message", control_type="Edit").wrapper_object()
+    message_box = skype_window.Skype.child_window(
+        title="Type a message", control_type="Edit"
+    ).wrapper_object()
     message_box.click_input()
     time.sleep(1)
     keyboard.send_keys(message, with_spaces=True)
-    keyboard.send_keys('{ENTER}')
+    keyboard.send_keys("{ENTER}")
     logging.info(message)
 
 
 def send_media_message(filepath):
     # Click the send button
-    file_button = skype_window.Skype.child_window(title="Add files", control_type="Button").wrapper_object()
+    file_button = skype_window.Skype.child_window(
+        title="Add files", control_type="Button"
+    ).wrapper_object()
     file_button.click_input()
     # Navigate to the file
     file_window = Desktop().window(title="Open")
-    file_window.type_keys(filepath + '{ENTER}', with_spaces=True)
+    file_window.type_keys(filepath + "{ENTER}", with_spaces=True)
     # Wait for the image to load
     time.sleep(10)
-    message_box = skype_window.Skype.child_window(title="Type a message", control_type="Edit").wrapper_object()
+    message_box = skype_window.Skype.child_window(
+        title="Type a message", control_type="Edit"
+    ).wrapper_object()
     message_box.click_input()
-    message_box.type_keys('{ENTER}', with_spaces=True)
+    message_box.type_keys("{ENTER}", with_spaces=True)
     logging.info(filepath)
 
 
 def populate_data_skype(all_data_to_populate, account):
     # Select the other account
-    if account == '0':
+    if account == "0":
         select_chat_channel("Jane Doe")
     else:
         select_chat_channel("John Doe")
@@ -111,9 +133,14 @@ def populate_data_skype(all_data_to_populate, account):
 
 # Load conversation History from JSON
 @click.command()
-@click.option('--filepath', '-f', required=True, default='data/conversation.json',
-              help="Relative file path to JSON with conversation data")
-@click.option('--account', '-a', required=True, default='0', help='Account to populate')
+@click.option(
+    "--filepath",
+    "-f",
+    required=True,
+    default="data/conversation.json",
+    help="Relative file path to JSON with conversation data",
+)
+@click.option("--account", "-a", required=True, default="0", help="Account to populate")
 def cli(filepath, account):
     header = pyfiglet.figlet_format("Forensics.im Util")
     click.echo(header)
@@ -122,5 +149,5 @@ def cli(filepath, account):
         populate_data_skype(data, account)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     cli()

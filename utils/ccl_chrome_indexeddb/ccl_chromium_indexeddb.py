@@ -54,9 +54,9 @@ def _read_le_varint(stream: typing.BinaryIO, *, is_google_32bit=False):
         raw = stream.read(1)
         if len(raw) < 1:
             return None
-        tmp, = raw
+        (tmp,) = raw
         underlying_bytes.append(tmp)
-        result |= ((tmp & 0x7f) << (i * 7))
+        result |= (tmp & 0x7F) << (i * 7)
 
         if (tmp & 0x80) == 0:
             break
@@ -108,23 +108,27 @@ class IdbKey:
             self._raw_length = 1
         elif self.key_type == IdbKeyType.String:
             str_len, varint_raw = _le_varint_from_bytes(raw_key)
-            self.value = raw_key[len(varint_raw):len(varint_raw) + str_len * 2].decode("utf-16-be")
+            self.value = raw_key[
+                len(varint_raw) : len(varint_raw) + str_len * 2
+            ].decode("utf-16-be")
             self._raw_length = 1 + len(varint_raw) + str_len * 2
         elif self.key_type == IdbKeyType.Date:
-            ts, = struct.unpack("<d", raw_key[0:8])
-            self.value = datetime.datetime(1970, 1, 1) + datetime.timedelta(milliseconds=ts)
+            (ts,) = struct.unpack("<d", raw_key[0:8])
+            self.value = datetime.datetime(1970, 1, 1) + datetime.timedelta(
+                milliseconds=ts
+            )
             self._raw_length = 9
         elif self.key_type == IdbKeyType.Number:
             self.value = struct.unpack("<d", raw_key[0:8])[0]
             self._raw_length = 9
         elif self.key_type == IdbKeyType.Array:
             array_count, varint_raw = _le_varint_from_bytes(raw_key)
-            raw_key = raw_key[len(varint_raw):]
+            raw_key = raw_key[len(varint_raw) :]
             self.value = []
             self._raw_length = 1 + len(varint_raw)
             for i in range(array_count):
                 key = IdbKey(raw_key)
-                raw_key = raw_key[key._raw_length:]
+                raw_key = raw_key[key._raw_length :]
                 self._raw_length += key._raw_length
                 self.value.append(key)
             self.value = tuple(self.value)
@@ -135,13 +139,13 @@ class IdbKey:
             raise NotImplementedError()
         elif self.key_type == IdbKeyType.Binary:
             bin_len, varint_raw = _le_varint_from_bytes(raw_key)
-            self.value = raw_key[len(varint_raw):len(varint_raw) + bin_len]
+            self.value = raw_key[len(varint_raw) : len(varint_raw) + bin_len]
             self._raw_length = 1 + len(varint_raw) + bin_len
         else:
             raise ValueError()  # Shouldn't happen
 
         # trim the raw_key in case this is an inner key:
-        self.raw_key = self.raw_key[0: self._raw_length]
+        self.raw_key = self.raw_key[0 : self._raw_length]
 
     def __repr__(self):
         return f"<IdbKey {self.value}>"
@@ -169,10 +173,16 @@ class IndexedDBExternalObject:
     # see: https://github.com/chromium/chromium/blob/master/content/browser/indexed_db/indexed_db_backing_store.cc
     # for encoding.
 
-    def __init__(self, object_type: IndexedDBExternalObjectType, blob_number: typing.Optional[int],
-                 mime_type: typing.Optional[str], size: typing.Optional[int],
-                 file_name: typing.Optional[str], last_modified: typing.Optional[datetime.datetime],
-                 native_file_token: typing.Optional):
+    def __init__(
+        self,
+        object_type: IndexedDBExternalObjectType,
+        blob_number: typing.Optional[int],
+        mime_type: typing.Optional[str],
+        size: typing.Optional[int],
+        file_name: typing.Optional[str],
+        last_modified: typing.Optional[datetime.datetime],
+        native_file_token: typing.Optional,
+    ):
         self.object_type = object_type
         self.blob_number = blob_number
         self.mime_type = mime_type
@@ -184,7 +194,10 @@ class IndexedDBExternalObject:
     @classmethod
     def from_stream(cls, stream: typing.BinaryIO):
         blob_type = IndexedDBExternalObjectType(stream.read(1)[0])
-        if blob_type in (IndexedDBExternalObjectType.Blob, IndexedDBExternalObjectType.File):
+        if blob_type in (
+            IndexedDBExternalObjectType.Blob,
+            IndexedDBExternalObjectType.File,
+        ):
             blob_number = read_le_varint(stream)
             mime_type_length = read_le_varint(stream)
             mime_type = stream.read(mime_type_length * 2).decode("utf-16-be")
@@ -196,10 +209,19 @@ class IndexedDBExternalObject:
                 x, x_raw = _read_le_varint(stream)
                 last_modified_td = datetime.timedelta(microseconds=x)
                 last_modified = datetime.datetime(1601, 1, 1) + last_modified_td
-                return cls(blob_type, blob_number, mime_type, data_size, file_name,
-                           last_modified, None)
+                return cls(
+                    blob_type,
+                    blob_number,
+                    mime_type,
+                    data_size,
+                    file_name,
+                    last_modified,
+                    None,
+                )
             else:
-                return cls(blob_type, blob_number, mime_type, data_size, None, None, None)
+                return cls(
+                    blob_type, blob_number, mime_type, data_size, None, None, None
+                )
         else:
             raise NotImplementedError()
 
@@ -222,8 +244,11 @@ class GlobalMetadata:
         if raw_max_db_id := raw_meta_dict.get("\x00\x00\x00\x00\x01"):
             self.max_allocated_db_id = le_varint_from_bytes(raw_max_db_id)
 
-        database_ids_raw = (raw_meta_dict[x] for x in raw_meta_dict
-                            if x.startswith(b"\x00\x00\x00\x00\xc9"))
+        database_ids_raw = (
+            raw_meta_dict[x]
+            for x in raw_meta_dict
+            if x.startswith(b"\x00\x00\x00\x00\xc9")
+        )
 
         dbids = []
         for dbid_rec in database_ids_raw:
@@ -253,7 +278,9 @@ class DatabaseMetadata:
     def __init__(self, raw_meta: dict):
         self._metas = types.MappingProxyType(raw_meta)
 
-    def get_meta(self, db_id: int, meta_type: DatabaseMetadataType) -> typing.Optional[typing.Union[str, int]]:
+    def get_meta(
+        self, db_id: int, meta_type: DatabaseMetadataType
+    ) -> typing.Optional[typing.Union[str, int]]:
         record = self._metas.get((db_id, meta_type))
         if not record:
             return None
@@ -281,7 +308,9 @@ class ObjectStoreMetadata:
     def __init__(self, raw_meta: dict):
         self._metas = types.MappingProxyType(raw_meta)
 
-    def get_meta(self, db_id: int, obj_store_id: int, meta_type: ObjectStoreMetadataType):
+    def get_meta(
+        self, db_id: int, obj_store_id: int, meta_type: ObjectStoreMetadataType
+    ):
         record = self._metas.get((db_id, obj_store_id, meta_type))
         if not record:
             return None
@@ -295,8 +324,16 @@ class ObjectStoreMetadata:
 
 class IndexedDbRecord:
     def __init__(
-            self, owner: "IndexedDb", db_id: int, obj_store_id: int, key: IdbKey,
-            value: typing.Any, is_live: bool, ldb_seq_no: int, origin_file: os.PathLike):
+        self,
+        owner: "IndexedDb",
+        db_id: int,
+        obj_store_id: int,
+        key: IdbKey,
+        value: typing.Any,
+        is_live: bool,
+        ldb_seq_no: int,
+        origin_file: os.PathLike,
+    ):
         self.owner = owner
         self.db_id = db_id
         self.obj_store_id = obj_store_id
@@ -306,14 +343,22 @@ class IndexedDbRecord:
         self.sequence_number = ldb_seq_no
         self.origin_file = origin_file
 
-    def resolve_blob_index(self, blob_index: ccl_blink_value_deserializer.BlobIndex) -> IndexedDBExternalObject:
+    def resolve_blob_index(
+        self, blob_index: ccl_blink_value_deserializer.BlobIndex
+    ) -> IndexedDBExternalObject:
         """Resolve a ccl_blink_value_deserializer.BlobIndex to its IndexedDBExternalObject
-         to get metadata (file name, timestamps, etc)"""
-        return self.owner.get_blob_info(self.db_id, self.obj_store_id, self.key.raw_key, blob_index.index_id)
+        to get metadata (file name, timestamps, etc)"""
+        return self.owner.get_blob_info(
+            self.db_id, self.obj_store_id, self.key.raw_key, blob_index.index_id
+        )
 
-    def get_blob_stream(self, blob_index: ccl_blink_value_deserializer.BlobIndex) -> typing.BinaryIO:
+    def get_blob_stream(
+        self, blob_index: ccl_blink_value_deserializer.BlobIndex
+    ) -> typing.BinaryIO:
         """Resolve a ccl_blink_value_deserializer.BlobIndex to a stream of its content"""
-        return self.owner.get_blob(self.db_id, self.obj_store_id, self.key.raw_key, blob_index.index_id)
+        return self.owner.get_blob(
+            self.db_id, self.obj_store_id, self.key.raw_key, blob_index.index_id
+        )
 
 
 class IndexedDb:
@@ -329,7 +374,9 @@ class IndexedDb:
         self._blob_dir = leveldb_blob_dir
         self.global_metadata = GlobalMetadata(self._get_raw_global_metadata())
         self.database_metadata = DatabaseMetadata(self._get_raw_database_metadata())
-        self.object_store_meta = ObjectStoreMetadata(self._get_raw_object_store_metadata())
+        self.object_store_meta = ObjectStoreMetadata(
+            self._get_raw_object_store_metadata()
+        )
 
         self._blob_lookup_cache = {}
 
@@ -346,7 +393,7 @@ class IndexedDb:
             if val < 0:
                 raise ValueError
             while val > 0:
-                yield val & 0xff
+                yield val & 0xFF
                 val >> 8
 
         db_id_size = count_bytes(db_id)
@@ -356,22 +403,38 @@ class IndexedDb:
         if db_id_size > 8 or obj_store_id_size > 8 or index_id_size > 4:
             raise ValueError("id sizes are too big")
 
-        byte_one = ((db_id_size - 1) << 5) | ((obj_store_id_size - 1) << 2) | index_id_size
-        return bytes([byte_one, *yield_le_bytes(db_id), *yield_le_bytes(obj_store_id), *yield_le_bytes(index_id)])
+        byte_one = (
+            ((db_id_size - 1) << 5) | ((obj_store_id_size - 1) << 2) | index_id_size
+        )
+        return bytes(
+            [
+                byte_one,
+                *yield_le_bytes(db_id),
+                *yield_le_bytes(obj_store_id),
+                *yield_le_bytes(index_id),
+            ]
+        )
 
     def get_database_metadata(self, db_id: int, meta_type: DatabaseMetadataType):
         return self.database_metadata.get_meta(db_id, meta_type)
 
-    def get_object_store_metadata(self, db_id: int, obj_store_id: int, meta_type: ObjectStoreMetadataType):
+    def get_object_store_metadata(
+        self, db_id: int, obj_store_id: int, meta_type: ObjectStoreMetadataType
+    ):
         return self.object_store_meta.get_meta(db_id, obj_store_id, meta_type)
 
-    def _get_raw_global_metadata(self, live_only=True) -> typing.Dict[bytes, ccl_leveldb.Record]:
+    def _get_raw_global_metadata(
+        self, live_only=True
+    ) -> typing.Dict[bytes, ccl_leveldb.Record]:
         # Global metadata always has the prefix 0 0 0 0
         if not live_only:
             raise NotImplementedError("Deleted metadata not implemented yet")
         meta = {}
         for record in self._db.iterate_records_raw(reverse=True):
-            if record.key.startswith(b"\x00\x00\x00\x00") and record.state == ccl_leveldb.KeyState.Live:
+            if (
+                record.key.startswith(b"\x00\x00\x00\x00")
+                and record.state == ccl_leveldb.KeyState.Live
+            ):
                 # we only want live keys and the newest version thereof (highest seq)
                 if record.key not in meta or meta[record.key].seq < record.seq:
                     meta[record.key] = record
@@ -385,12 +448,17 @@ class IndexedDb:
         db_meta = {}
 
         for db_id in self.global_metadata.db_ids:
-            if db_id.dbid_no > 0x7f:
-                raise NotImplementedError("there could be this many dbs, but I don't support it yet")
+            if db_id.dbid_no > 0x7F:
+                raise NotImplementedError(
+                    "there could be this many dbs, but I don't support it yet"
+                )
 
             prefix = bytes([0, db_id.dbid_no, 0, 0])
             for record in self._db.iterate_records_raw(reverse=True):
-                if record.key.startswith(prefix) and record.state == ccl_leveldb.KeyState.Live:
+                if (
+                    record.key.startswith(prefix)
+                    and record.state == ccl_leveldb.KeyState.Live
+                ):
                     # we only want live keys and the newest version thereof (highest seq)
                     meta_type = record.key[len(prefix)]
                     old_version = db_meta.get((db_id.dbid_no, meta_type))
@@ -406,15 +474,22 @@ class IndexedDb:
         os_meta = {}
 
         for db_id in self.global_metadata.db_ids:
-            if db_id.dbid_no > 0x7f:
-                raise NotImplementedError("there could be this many dbs, but I don't support it yet")
+            if db_id.dbid_no > 0x7F:
+                raise NotImplementedError(
+                    "there could be this many dbs, but I don't support it yet"
+                )
 
             prefix = bytes([0, db_id.dbid_no, 0, 0, 50])
 
             for record in self._db.iterate_records_raw(reverse=True):
-                if record.key.startswith(prefix) and record.state == ccl_leveldb.KeyState.Live:
+                if (
+                    record.key.startswith(prefix)
+                    and record.state == ccl_leveldb.KeyState.Live
+                ):
                     # we only want live keys and the newest version thereof (highest seq)
-                    objstore_id, varint_raw = _le_varint_from_bytes(record.key[len(prefix):])
+                    objstore_id, varint_raw = _le_varint_from_bytes(
+                        record.key[len(prefix) :]
+                    )
                     meta_type = record.key[len(prefix) + len(varint_raw)]
 
                     old_version = os_meta.get((db_id.dbid_no, objstore_id, meta_type))
@@ -425,10 +500,19 @@ class IndexedDb:
         return os_meta
 
     def iterate_records(
-            self, db_id: int, store_id: int, *,
-            live_only=False, bad_deserializer_data_handler: typing.Callable[[IdbKey, bytes], typing.Any] = None):
-        if db_id > 0x7f or store_id > 0x7f:
-            raise NotImplementedError("there could be this many dbs or object stores, but I don't support it yet")
+        self,
+        db_id: int,
+        store_id: int,
+        *,
+        live_only=False,
+        bad_deserializer_data_handler: typing.Callable[
+            [IdbKey, bytes], typing.Any
+        ] = None,
+    ):
+        if db_id > 0x7F or store_id > 0x7F:
+            raise NotImplementedError(
+                "there could be this many dbs or object stores, but I don't support it yet"
+            )
 
         blink_deserializer = ccl_blink_value_deserializer.BlinkV8Deserializer()
 
@@ -436,7 +520,7 @@ class IndexedDb:
         prefix = bytes([0, db_id, store_id, 1])
         for record in self._db.iterate_records_raw():
             if record.key.startswith(prefix):
-                key = IdbKey(record.key[len(prefix):])
+                key = IdbKey(record.key[len(prefix) :])
                 if not record.value:
                     # empty values will obviously fail, returning None is probably better than dying.
                     return key, None
@@ -444,7 +528,7 @@ class IndexedDb:
                 val_idx = len(varint_raw)
                 # read the blink envelope
                 blink_type_tag = record.value[val_idx]
-                if blink_type_tag != 0xff:
+                if blink_type_tag != 0xFF:
                     # TODO: probably don't want to fail hard here long term...
                     if bad_deserializer_data_handler is not None:
                         bad_deserializer_data_handler(key, record.value)
@@ -453,13 +537,16 @@ class IndexedDb:
                         raise ValueError("Blink type tag not present")
                 val_idx += 1
 
-                blink_version, varint_raw = _le_varint_from_bytes(record.value[val_idx:])
+                blink_version, varint_raw = _le_varint_from_bytes(
+                    record.value[val_idx:]
+                )
 
                 val_idx += len(varint_raw)
 
                 obj_raw = io.BytesIO(record.value[val_idx:])
                 deserializer = ccl_v8_value_deserializer.Deserializer(
-                    obj_raw, host_object_delegate=blink_deserializer.read)
+                    obj_raw, host_object_delegate=blink_deserializer.read
+                )
                 try:
                     value = deserializer.read()
                 except Exception:
@@ -467,14 +554,28 @@ class IndexedDb:
                         bad_deserializer_data_handler(key, record.value)
                         continue
                     raise
-                yield IndexedDbRecord(self, db_id, store_id, key, value,
-                                      record.state == ccl_leveldb.KeyState.Live, record.seq, record.origin_file)
+                yield IndexedDbRecord(
+                    self,
+                    db_id,
+                    store_id,
+                    key,
+                    value,
+                    record.state == ccl_leveldb.KeyState.Live,
+                    record.seq,
+                    record.origin_file,
+                )
 
-    def get_blob_info(self, db_id: int, store_id: int, raw_key: bytes, file_index: int) -> IndexedDBExternalObject:
-        if db_id > 0x7f or store_id > 0x7f:
-            raise NotImplementedError("there could be this many dbs, but I don't support it yet")
+    def get_blob_info(
+        self, db_id: int, store_id: int, raw_key: bytes, file_index: int
+    ) -> IndexedDBExternalObject:
+        if db_id > 0x7F or store_id > 0x7F:
+            raise NotImplementedError(
+                "there could be this many dbs, but I don't support it yet"
+            )
 
-        if result := self._blob_lookup_cache.get((db_id, store_id, raw_key, file_index)):
+        if result := self._blob_lookup_cache.get(
+            (db_id, store_id, raw_key, file_index)
+        ):
             return result
 
         # goodness me this is a slow way of doing things,
@@ -490,12 +591,16 @@ class IndexedDb:
                     idx += 1
                 break
 
-        if result := self._blob_lookup_cache.get((db_id, store_id, raw_key, file_index)):
+        if result := self._blob_lookup_cache.get(
+            (db_id, store_id, raw_key, file_index)
+        ):
             return result
         else:
             raise KeyError((db_id, store_id, raw_key, file_index))
 
-    def get_blob(self, db_id: int, store_id: int, raw_key: bytes, file_index: int) -> typing.BinaryIO:
+    def get_blob(
+        self, db_id: int, store_id: int, raw_key: bytes, file_index: int
+    ) -> typing.BinaryIO:
         # Some detail here: https://github.com/chromium/chromium/blob/master/content/browser/indexed_db/docs/README.md
         if self._blob_dir is None:
             raise ValueError("Can't resolve blob if blob dir is not set")
@@ -503,7 +608,12 @@ class IndexedDb:
 
         # path will be: origin.blob/database id/top 16 bits of blob number with two digits/blob number
         # TODO: check if this is still the case on non-windows systems
-        path = pathlib.Path(self._blob_dir, str(db_id), f"{info.blob_number >> 8:02x}", f"{info.blob_number:x}")
+        path = pathlib.Path(
+            self._blob_dir,
+            str(db_id),
+            f"{info.blob_number >> 8:02x}",
+            f"{info.blob_number:x}",
+        )
 
         if path.exists():
             return path.open("rb")
@@ -528,33 +638,48 @@ class WrappedObjectStore:
     @property
     def name(self) -> str:
         return self._raw_db.get_object_store_metadata(
-            self._dbid_no, self._obj_store_id, ObjectStoreMetadataType.StoreName)
+            self._dbid_no, self._obj_store_id, ObjectStoreMetadataType.StoreName
+        )
 
     @staticmethod
     def _log_error(key: IdbKey, data: bytes):
         sys.stderr.write(f"ERROR decoding key: {key}\n")
 
     def get_blob(self, raw_key: bytes, file_index: int) -> typing.BinaryIO:
-        return self._raw_db.get_blob(self._dbid_no, self.object_store_id, raw_key, file_index)
+        return self._raw_db.get_blob(
+            self._dbid_no, self.object_store_id, raw_key, file_index
+        )
 
     # def __iter__(self):
     #     yield from self._raw_db.iterate_records(self._dbid_no, self._obj_store_id)
 
     def iterate_records(
-            self, *, live_only=False, errors_to_stdout=False,
-            bad_deserializer_data_handler: typing.Callable[[IdbKey, bytes], typing.Any] = None):
-
+        self,
+        *,
+        live_only=False,
+        errors_to_stdout=False,
+        bad_deserializer_data_handler: typing.Callable[
+            [IdbKey, bytes], typing.Any
+        ] = None,
+    ):
         def _handler(key, record):
             if bad_deserializer_data_handler is not None:
                 bad_deserializer_data_handler(key, record)
             if errors_to_stdout:
                 WrappedObjectStore._log_error(key, record)
 
-        handler = _handler if errors_to_stdout or bad_deserializer_data_handler is not None else None
+        handler = (
+            _handler
+            if errors_to_stdout or bad_deserializer_data_handler is not None
+            else None
+        )
 
         yield from self._raw_db.iterate_records(
-            self._dbid_no, self._obj_store_id, live_only=live_only,
-            bad_deserializer_data_handler=handler)
+            self._dbid_no,
+            self._obj_store_id,
+            live_only=live_only,
+            bad_deserializer_data_handler=handler,
+        )
 
     def __repr__(self):
         return f"<WrappedObjectStore: object_store_id={self.object_store_id}; name={self.name}>"
@@ -567,13 +692,17 @@ class WrappedDatabase:
 
         names = []
         for obj_store_id in range(1, self.object_store_count + 1):
-            names.append(self._raw_db.get_object_store_metadata(
-                self.db_number, obj_store_id, ObjectStoreMetadataType.StoreName))
+            names.append(
+                self._raw_db.get_object_store_metadata(
+                    self.db_number, obj_store_id, ObjectStoreMetadataType.StoreName
+                )
+            )
         self._obj_store_names = tuple(names)
         # pre-compile object store wrappers as there's little overhead
         self._obj_stores = tuple(
-            WrappedObjectStore(
-                self._raw_db, self.db_number, i) for i in range(1, self.object_store_count + 1))
+            WrappedObjectStore(self._raw_db, self.db_number, i)
+            for i in range(1, self.object_store_count + 1)
+        )
 
     @property
     def name(self) -> str:
@@ -590,9 +719,12 @@ class WrappedDatabase:
     @property
     def object_store_count(self) -> int:
         # NB obj store ids are enumerated from 1.
-        return self._raw_db.get_database_metadata(
-            self.db_number,
-            DatabaseMetadataType.MaximumObjectStoreId) or 0  # returns None if there are none.
+        return (
+            self._raw_db.get_database_metadata(
+                self.db_number, DatabaseMetadataType.MaximumObjectStoreId
+            )
+            or 0
+        )  # returns None if there are none.
 
     @property
     def object_store_names(self) -> typing.Iterable[str]:
@@ -601,8 +733,10 @@ class WrappedDatabase:
     def get_object_store_by_id(self, obj_store_id: int) -> WrappedObjectStore:
         if obj_store_id > 0 and obj_store_id <= self.object_store_count:
             return self._obj_stores[obj_store_id - 1]
-        raise ValueError("obj_store_id must be greater than zero and less or equal to object_store_count "
-                         "NB object stores are enumerated from 1 - there is no store with id 0")
+        raise ValueError(
+            "obj_store_id must be greater than zero and less or equal to object_store_count "
+            "NB object stores are enumerated from 1 - there is no store with id 0"
+        )
 
     def get_object_store_by_name(self, name: str) -> WrappedObjectStore:
         if name in self:
@@ -629,15 +763,19 @@ class WrappedDatabase:
 class WrappedIndexDB:
     def __init__(self, leveldb_dir: os.PathLike, leveldb_blob_dir: os.PathLike = None):
         self._raw_db = IndexedDb(leveldb_dir, leveldb_blob_dir)
-        self._multiple_origins = len(set(x.origin for x in self._raw_db.global_metadata.db_ids)) > 1
+        self._multiple_origins = (
+            len(set(x.origin for x in self._raw_db.global_metadata.db_ids)) > 1
+        )
 
         self._db_number_lookup = {
             x.dbid_no: WrappedDatabase(self._raw_db, x)
-            for x in self._raw_db.global_metadata.db_ids}
+            for x in self._raw_db.global_metadata.db_ids
+        }
         # set origin to 0 if there's only 1 and we'll ignore it in all lookups
         self._db_name_lookup = {
             (x.name, x.origin if self.has_multiple_origins else 0): x
-            for x in self._db_number_lookup.values()}
+            for x in self._db_number_lookup.values()
+        }
 
     @property
     def database_count(self):
@@ -658,7 +796,8 @@ class WrappedIndexDB:
         if isinstance(item, str):
             if self.has_multiple_origins:
                 raise ValueError(
-                    "Database contains multiple origins, lookups must be provided as a tuple of (name, origin)")
+                    "Database contains multiple origins, lookups must be provided as a tuple of (name, origin)"
+                )
             return (item, 0) in self._db_name_lookup
         elif isinstance(item, tuple) and len(item) == 2:
             name, origin = item
@@ -669,9 +808,12 @@ class WrappedIndexDB:
             return item in self._db_number_lookup
         else:
             raise TypeError(
-                "keys must be provided as a tuple of (name, origin) or a str (if only single origin) or int")
+                "keys must be provided as a tuple of (name, origin) or a str (if only single origin) or int"
+            )
 
-    def __getitem__(self, item: typing.Union[int, str, typing.Tuple[str, str]]) -> WrappedDatabase:
+    def __getitem__(
+        self, item: typing.Union[int, str, typing.Tuple[str, str]]
+    ) -> WrappedDatabase:
         if isinstance(item, int):
             if item in self._db_number_lookup:
                 return self._db_number_lookup[item]
@@ -680,7 +822,8 @@ class WrappedIndexDB:
         elif isinstance(item, str):
             if self.has_multiple_origins:
                 raise ValueError(
-                    "Database contains multiple origins, indexes must be provided as a tuple of (name, origin)")
+                    "Database contains multiple origins, indexes must be provided as a tuple of (name, origin)"
+                )
             if item in self:
                 return self._db_name_lookup[item, 0]
             else:

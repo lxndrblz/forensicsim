@@ -46,7 +46,9 @@ def log(msg, debug_only=True):
         print(f"{caller_name} ({caller_line}):\t{msg}")
 
 
-def read_le_varint(stream: typing.BinaryIO) -> typing.Optional[typing.Tuple[int, bytes]]:
+def read_le_varint(
+    stream: typing.BinaryIO,
+) -> typing.Optional[typing.Tuple[int, bytes]]:
     # this only outputs unsigned
     i = 0
     result = 0
@@ -55,9 +57,9 @@ def read_le_varint(stream: typing.BinaryIO) -> typing.Optional[typing.Tuple[int,
         raw = stream.read(1)
         if len(raw) < 1:
             return None
-        tmp, = raw
+        (tmp,) = raw
         underlying_bytes.append(tmp)
-        result |= ((tmp & 0x7f) << (i * 7))
+        result |= (tmp & 0x7F) << (i * 7)
         if (tmp & 0x80) == 0:
             break
         i += 1
@@ -109,7 +111,7 @@ class Constants:
     token_kBigInt = b"Z"
     # byteLength:uint32_t, then raw data
     token_kUtf8String = b"S"
-    token_kOneByteString = b"\""
+    token_kOneByteString = b'"'
     token_kTwoByteString = b"c"
     # Reference to a serialized object. objectID:uint32_t
     token_kObjectReference = b"^"
@@ -221,20 +223,22 @@ class ArrayBufferViewTag:
     tag_kBigUint64Array = "Q"
     tag_kDataView = "?"
 
-    STRUCT_LOOKUP = types.MappingProxyType({
-        tag_kInt8Array: "b",
-        tag_kUint8Array: "B",
-        tag_kUint8ClampedArray: "B",
-        tag_kInt16Array: "h",
-        tag_kUint16Array: "H",
-        tag_kInt32Array: "i",
-        tag_kUint32Array: "I",
-        tag_kFloat32Array: "f",
-        tag_kFloat64Array: "d",
-        tag_kBigInt64Array: "q",
-        tag_kBigUint64Array: "Q",
-        tag_kDataView: "c"
-    })
+    STRUCT_LOOKUP = types.MappingProxyType(
+        {
+            tag_kInt8Array: "b",
+            tag_kUint8Array: "B",
+            tag_kUint8ClampedArray: "B",
+            tag_kInt16Array: "h",
+            tag_kUint16Array: "H",
+            tag_kInt32Array: "i",
+            tag_kUint32Array: "I",
+            tag_kFloat32Array: "f",
+            tag_kFloat64Array: "d",
+            tag_kBigInt64Array: "q",
+            tag_kBigUint64Array: "Q",
+            tag_kDataView: "c",
+        }
+    )
 
 
 class Deserializer:
@@ -253,11 +257,17 @@ class Deserializer:
         Constants.token_kFalseObject,
         Constants.token_kNumberObject,
         Constants.token_kBigIntObject,
-        Constants.token_kStringObject
+        Constants.token_kStringObject,
     }
 
-    def __init__(self, stream: typing.BinaryIO, host_object_delegate: typing.Callable,
-                 *, is_little_endian=True, is_64bit=True):
+    def __init__(
+        self,
+        stream: typing.BinaryIO,
+        host_object_delegate: typing.Callable,
+        *,
+        is_little_endian=True,
+        is_64bit=True,
+    ):
         self._f = stream
         self._host_object_delegate = host_object_delegate
         self._endian = "<" if is_little_endian else ">"
@@ -270,7 +280,9 @@ class Deserializer:
         start = self._f.tell()
         raw = self._f.read(length)
         if len(raw) != length:
-            raise ValueError(f"Could not read all data at offset {start}; wanted {length}; got {len(raw)}")
+            raise ValueError(
+                f"Could not read all data at offset {start}; wanted {length}; got {len(raw)}"
+            )
 
         return raw
 
@@ -299,7 +311,9 @@ class Deserializer:
         size = size_flag >> 4
         raw = self._read_raw(size * self._pointer_size)
 
-        value = int.from_bytes(raw, "big" if self._endian == ">" else "little", signed=False)
+        value = int.from_bytes(
+            raw, "big" if self._endian == ">" else "little", signed=False
+        )
         if is_neg:
             value = -value
 
@@ -364,7 +378,9 @@ class Deserializer:
         self._objects.append(regex)
         return regex
 
-    def _read_js_object_properties(self, end_tag) -> typing.Iterable[typing.Tuple[typing.Any, typing.Any]]:
+    def _read_js_object_properties(
+        self, end_tag
+    ) -> typing.Iterable[typing.Tuple[typing.Any, typing.Any]]:
         log(f"Reading object properties at {self._f.tell()} with end tag: {end_tag}")
         while True:
             if self._peek_tag() == end_tag:
@@ -393,7 +409,9 @@ class Deserializer:
         #
         # assert self._read_tag() == end_tag
         property_count = self._read_le_varint()[0]
-        log(f"Actual property count: {len(result)}; stated property count: {property_count}")
+        log(
+            f"Actual property count: {len(result)}; stated property count: {property_count}"
+        )
         if len(result) != property_count:
             raise ValueError("Property count mismatch")
 
@@ -406,7 +424,9 @@ class Deserializer:
         result = [None for _ in range(length)]
         self._objects.append(result)
 
-        sparse_object = self._read_js_object_properties(Constants.token_kEndSparseJSArray)
+        sparse_object = self._read_js_object_properties(
+            Constants.token_kEndSparseJSArray
+        )
         prop_count = 0
         for key, value in sparse_object:
             i = int(key)
@@ -414,7 +434,9 @@ class Deserializer:
             prop_count += 1
         expected_num_properties = self._read_le_varint()[0]
 
-        log(f"Actual property count: {prop_count}; stated property count: {expected_num_properties}")
+        log(
+            f"Actual property count: {prop_count}; stated property count: {expected_num_properties}"
+        )
         if prop_count != expected_num_properties:
             raise ValueError("Property count mismatch")
 
@@ -432,7 +454,9 @@ class Deserializer:
             result[i] = self._read_object()
 
         # And then there's a sparse bit maybe?
-        sparse_object = self._read_js_object_properties(Constants.token_kEndDenseJSArray)
+        sparse_object = self._read_js_object_properties(
+            Constants.token_kEndDenseJSArray
+        )
         prop_count = 0
         for key, value in sparse_object:
             i = int(key)
@@ -441,7 +465,9 @@ class Deserializer:
 
         expected_num_properties = self._read_le_varint()[0]
 
-        log(f"Actual property count: {prop_count}; stated property count: {expected_num_properties}")
+        log(
+            f"Actual property count: {prop_count}; stated property count: {expected_num_properties}"
+        )
         if prop_count != expected_num_properties:
             raise ValueError("Property count mismatch")
 
@@ -465,7 +491,9 @@ class Deserializer:
         assert self._read_tag() == Constants.token_kEndJSMap
 
         expected_length = self._read_le_varint()[0]
-        log(f"Actual map item count: {len(result) * 2}; stated map item count: {expected_length}")
+        log(
+            f"Actual map item count: {len(result) * 2}; stated map item count: {expected_length}"
+        )
         if expected_length != len(result) * 2:
             raise ValueError("Map count mismatch")
 
@@ -486,7 +514,9 @@ class Deserializer:
         assert self._read_tag() == Constants.token_kEndJSSet
 
         expected_length = self._read_le_varint()[0]
-        log(f"Actual set item count: {len(result)}; stated set item count: {expected_length}")
+        log(
+            f"Actual set item count: {len(result)}; stated set item count: {expected_length}"
+        )
         if expected_length != len(result):
             raise ValueError("Set count mismatch")
 
@@ -501,7 +531,9 @@ class Deserializer:
 
     def _wrap_js_array_buffer_view(self, raw: bytes) -> tuple:
         if not isinstance(raw, bytes):
-            raise TypeError("Only bytes should be passed to be wrapped in a buffer view")
+            raise TypeError(
+                "Only bytes should be passed to be wrapped in a buffer view"
+            )
 
         log(f"Wrapping in ArrayBufferView at offset {self._f.tell()}")
 
@@ -512,17 +544,24 @@ class Deserializer:
         if byte_offset + byte_length > len(raw):
             raise ValueError("Not enough data in the raw data to hold the defined data")
 
-        log(f"ArrayBufferView: tag: {tag}; byte_offset: {byte_offset}; byte_length: {byte_length}")
+        log(
+            f"ArrayBufferView: tag: {tag}; byte_offset: {byte_offset}; byte_length: {byte_length}"
+        )
 
         fmt = ArrayBufferViewTag.STRUCT_LOOKUP[tag]
         element_length = struct.calcsize(fmt)
         if byte_length % element_length != 0:
-            raise ValueError(f"ArrayBufferView doesn't fit nicely: byte_length: {byte_length}; "
-                             f"element_length: {element_length}")
+            raise ValueError(
+                f"ArrayBufferView doesn't fit nicely: byte_length: {byte_length}; "
+                f"element_length: {element_length}"
+            )
 
         element_count = byte_length // element_length
 
-        return struct.unpack(f"{self._endian}{element_count}{fmt}", raw[byte_offset: byte_offset + byte_length])
+        return struct.unpack(
+            f"{self._endian}{element_count}{fmt}",
+            raw[byte_offset : byte_offset + byte_length],
+        )
 
     def _read_host_object(self) -> typing.Any:
         result = self._host_object_delegate(self._f)
@@ -541,8 +580,12 @@ class Deserializer:
             return tag, Deserializer.__ODDBALLS[tag]
 
         func = {
-            Constants.token_kTrueObject: lambda: Deserializer.__ODDBALLS[Constants.token_kTrue],
-            Constants.token_kFalseObject: lambda: Deserializer.__ODDBALLS[Constants.token_kFalse],
+            Constants.token_kTrueObject: lambda: Deserializer.__ODDBALLS[
+                Constants.token_kTrue
+            ],
+            Constants.token_kFalseObject: lambda: Deserializer.__ODDBALLS[
+                Constants.token_kFalse
+            ],
             Constants.token_kNumberObject: self._read_double,
             Constants.token_kUint32: self._read_le_varint,
             Constants.token_kInt32: self._read_zigzag,
