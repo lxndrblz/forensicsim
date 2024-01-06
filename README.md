@@ -10,7 +10,7 @@ the binary *ldb* files, which contain the majority of the entries and allows ide
 messages and contacts, and presets these in Autopsy's blackboard view.
 
 This parser has been tested using:
-* Microsoft Teams 1.4.00.11161 (Windows 10) with a free business organisation 
+* Microsoft Teams 1.4.00.11161 (Windows 10) with a free business organisation
 * Microsoft "Teams 2.0" (Windows 11) 48/21062133356 with a personal organisation
 
 This plugin is an artefact of the Master Thesis *Digital Forensic Acquisition and Analysis
@@ -169,5 +169,4 @@ The `populationdata` contains *JSON* files of the communication that has been po
 - [ccl_chrome_indexeddb](https://github.com/cclgroupltd/ccl_chrome_indexeddb) Python module for enumerating the *
   LevelDB* artefacts without external dependencies.
 - [Gutenberg Project](https://www.gutenberg.org/files/1661/1661-0.txt) Part of Arthur Conan Doyle's book *The Adventures
-  of Sherlock Holmes* have been used for creating a natural conversation between the two demo accounts. 
- 
+  of Sherlock Holmes* have been used for creating a natural conversation between the two demo accounts.
