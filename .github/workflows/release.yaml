@@ -1,7 +1,6 @@
 on:
-    # release:
-    #     types: [published]
-  push:
+    release:
+        types: [published]
 permissions:
     contents: write
 jobs:
@@ -20,10 +19,10 @@ jobs:
             python -m pip install -r requirements.txt pyinstaller
     - name: Build binary
       run:  pyinstaller "main.spec"
-    # - name: Upload artifacts to GitHub Release
-    #   env:
-    #         GITHUB_TOKEN: ${{ github.token }}
-    #   run: >-
-    #     gh release upload
-    #     '${{ github.ref_name }}' dist/*exe
-    #     --repo '${{ github.repository }}'
+    - name: Upload artifacts to GitHub Release
+      env:
+            GITHUB_TOKEN: ${{ github.token }}
+      run: >-
+        gh release upload
+        '${{ github.ref_name }}' dist/*exe
+        --repo '${{ github.repository }}'
