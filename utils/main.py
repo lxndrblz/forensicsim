@@ -35,7 +35,7 @@ from bs4 import BeautifulSoup
 import shared
 import sys
 
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, fields, asdict
 
 MESSAGE_TYPES = {
     "messages": {
@@ -238,10 +238,10 @@ def _parse_conversations(conversations: list[dict]) -> set(Conversation):
         last_message = rec.get("value", {}).get("lastMessage", {})
 
         kwargs = rec.get("value", {}) | {
-            "origin_file": rec.get("origin_file"),
             "cachedDeduplicationKey": last_message.get("cachedDeduplicationKey"),
-            "type": rec.get("type"),
+            "origin_file": rec.get("origin_file"),
             "threadProperties": rec.get("threadProperties"),
+            "type": rec.get("type"),
         }
 
         if kwargs["type"] == "Meeting" and "meeting" in kwargs["threadProperties"]:
@@ -250,15 +250,13 @@ def _parse_conversations(conversations: list[dict]) -> set(Conversation):
             )
             kwargs["record_type"] = "meeting"
             cleaned_conversations.add(Conversation(**kwargs))
-        # Other types include Message, Chat, Space, however, these did not include any records of evidential value
-        # for my test data. It might be relevant to investigate these further with a different test scenario.
 
     return cleaned_conversations
 
 
-# def _parse_reply_chain(reply_chains: list[dict]) -> set(Messages):
-#     cleaned_reply_chains = set()
-#     for reply_chain in reply_chains:
+def _parse_reply_chains(reply_chains: list[dict]) -> set(Message):
+    cleaned_reply_chains = set()
+    return cleaned_reply_chains
 
 
 def parse_reply_chain(reply_chains):
@@ -343,12 +341,12 @@ def parse_reply_chain(reply_chains):
                         )
                         print("\t ", value)
 
-    # Deduplicate based on cachedDeduplicationKey, as messages appear often multiple times within
-    cleaned = deduplicate(cleaned, "cachedDeduplicationKey")
+    # # Deduplicate based on cachedDeduplicationKey, as messages appear often multiple times within
+    # cleaned = deduplicate(cleaned, "cachedDeduplicationKey")
     return cleaned
 
 
-def parse_records(records):
+def parse_records(records: list[dict]) -> list[dict]:
     parsed_records = []
 
     # Parse the records based on the store they are in.
@@ -363,13 +361,13 @@ def parse_records(records):
 
     # parse text messages, posts, call logs, file transfers
     reply_chains = [d for d in records if d["store"] == "replychains"]
-    parsed_records += parse_reply_chain(reply_chains)
+    parsed_records += _parse_reply_chains(reply_chains)
 
     # parse meetings
     conversations = [d for d in records if d["store"] == "conversations"]
     parsed_records += _parse_conversations(conversations)
 
-    return parsed_records
+    return [asdict(r) for r in parsed_records]
 
 
 def process_db(filepath, output_path):
