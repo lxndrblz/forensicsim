@@ -1,6 +1,6 @@
 # Forensics.im Microsoft Teams Parser & Autopsy Plugin 🕵️‍♂️
 
-[![MIT License](https://img.shields.io/apm/l/atomic-design-ui.svg?)](https://github.com/lxndrblz/forensicsim/blob/main/LICENSE.md)
+![GitHub License](https://img.shields.io/github/license/lxndrblz/forensicsim)
 ![Build Status](https://www.travis-ci.com/lxndrblz/forensicsim.svg?token=ts66FZeijedzeqpkgTit&branch=main)
 
 Forensics.im is an Autopsy Plugin, which allows parsing *levelDB* of modern Electron-based Instant Messenger
