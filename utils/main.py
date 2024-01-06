@@ -82,7 +82,7 @@ MESSAGE_TYPES = {
 
 
 @dataclass(init=False)
-class People:
+class Contact:
     # values
     displayName: str | None = None
     mri: str | None = None
@@ -91,7 +91,7 @@ class People:
 
     # store + origin_file
     origin_file: str | None = None
-    record_type: str = "people"
+    record_type: str = "contact"
 
     def __init__(self, **kwargs):
         # allow to pass optional kwargs
@@ -164,39 +164,22 @@ def decode_and_loads(properties):
     return json.loads(properties)
 
 
-def parse_people(people):
-    cleaned_people = []
+def parse_people(people: list[dict]) -> set(Contact):
+    parsed_people = []
     for rec in people:
-        kwargs = rec.get("value") | rec.get("origin_file")
-        c = People(**kwargs)
-        cleaned_people.add(c)
-    return set(cleaned_people)
+        kwargs = rec.get("value", {}) | {"origin_file": rec.get("origin_file")}
+        parsed_people.add(Contact(**kwargs))
+    return set(parsed_people)
 
 
-def parse_budies(buddylists):
-    cleaned = []
-    for buddylist in buddylists:
-        if "buddies" in buddylist["value"]:
-            buddies = buddylist["value"]["buddies"]
-            for buddy in buddies:
-                try:
-                    x = extract_fields(buddy, "buddy")
-                    # Add non existent fields as null to match contact type
-                    x["email"] = None
-                    x["userPrincipalName"] = None
-                    x["origin_file"] = buddylist["origin_file"]
-                    x["record_type"] = "contact"
-                    cleaned.append(x)
-                except UnicodeDecodeError or KeyError or NameError:
-                    print(
-                        "Could not decode the following contact (output is not deduplicated)."
-                    )
-                    print("\t ", buddy)
-
-    # Deduplicate based on mri - should be unique anyway
-    cleaned = deduplicate(cleaned, "mri")
-
-    return cleaned
+def parse_buddies(buddies: list[dict]) -> set(Contact):
+    parsed_buddies = []
+    for rec in buddies:
+        kwargs = rec.get("value", {}).get("buddies") | {
+            "origin_file": rec.get("origin_file")
+        }
+        parsed_buddies.add(Contact(**kwargs))
+    return set(parsed_buddies)
 
 
 def parse_reply_chain(reply_chains):
@@ -338,7 +321,7 @@ def parse_records(records):
 
     # parse people teams 2 personal aka buddies
     people = [d for d in records if d["store"] == "buddylist"]
-    parsed_records += parse_budies(people)
+    parsed_records += parse_buddies(people)
 
     # parse text messages, posts, call logs, file transfers
     reply_chains = [d for d in records if d["store"] == "replychains"]
