@@ -1,6 +1,6 @@
 2021/06/01-11:08:22.749 1bc8 Reusing MANIFEST C:\Users\forensics\AppData\Roaming\Microsoft\Teams\IndexedDB\https_teams.microsoft.com_0.indexeddb.leveldb/MANIFEST-000001
 2021/06/01-11:08:22.751 1bc8 Recovering log #80
-2021/06/01-11:08:22.755 1bc8 Reusing old log C:\Users\forensics\AppData\Roaming\Microsoft\Teams\IndexedDB\https_teams.microsoft.com_0.indexeddb.leveldb/000080.log 
+2021/06/01-11:08:22.755 1bc8 Reusing old log C:\Users\forensics\AppData\Roaming\Microsoft\Teams\IndexedDB\https_teams.microsoft.com_0.indexeddb.leveldb/000080.log
 2021/06/01-11:34:29.465 878 Level-0 table #86: started
 2021/06/01-11:34:29.550 878 Level-0 table #86: 1572363 bytes OK
 2021/06/01-11:34:29.571 878 Delete type=0 #80

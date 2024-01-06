@@ -27,10 +27,10 @@
 
 # Parses LevelDb's of Electron-based Microsoft Teams Desktop Client
 # May 2021
-# 
-# Comments 
+#
+# Comments
 #   Version 1.0 - Initial version - May 2021
-# 
+#
 
 import calendar
 import inspect

@@ -6,7 +6,7 @@ authors:
     affiliation: "Abertay University"
     orcid: "https://orcid.org/0000-0002-0692-2482"
 title: "Forensics.im Microsoft Teams Parser & Autopsy Plugin"
-keywords: 
+keywords:
   - "Microsoft Teams"
   - Forensics
   - Electron
