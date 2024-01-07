@@ -168,24 +168,13 @@ def map_updated_teams_keys(value):
     value["clientmessageid"] = value["clientMessageId"]
     value["contenttype"] = value["contentType"]
     value["messagetype"] = value["messageType"]
-
-    # remove the new keys
-    del value["isSentByCurrentUser"]
-    del value["originalArrivalTime"]
-    del value["clientMessageId"]
-    del value["contentType"]
-    del value["messageType"]
     return value
 
 
 def strip_html_tags(value):
-    try:
-        # Get the text of any embedded html, such as divs, a href links
-        soup = BeautifulSoup(value, features="html.parser")
-        text = soup.get_text()
-        return text
-    except:
-        return value
+    # Get the text of any embedded html, such as divs, a href links
+    soup = BeautifulSoup(value, features="html.parser")
+    return soup.get_text()
 
 
 def convert_time_stamps(content_utf8_encoded):
@@ -208,7 +197,7 @@ def extract_fields(record, keys):
 
 
 def decode_and_loads(properties):
-    if type(properties) is bytes:
+    if isinstance(properties, bytes):
         soup = BeautifulSoup(properties, features="html.parser")
         properties = properties.decode(soup.original_encoding)
     return json.loads(properties)
