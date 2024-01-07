@@ -6,6 +6,8 @@ jobs:
       runs-on: windows-latest
       steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: True
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
