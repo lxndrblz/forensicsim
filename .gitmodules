@@ -4,3 +4,6 @@
 [submodule "utils\\ccl_chrome_indexeddb"]
 	path = utils\\ccl_chrome_indexeddb
 	url = https://github.com/cclgroupltd/ccl_chrome_indexeddb/
+[submodule "forensicsim-data"]
+	path = forensicsim-data
+	url = https://github.com/KarelZe/forensicsim-data.git
