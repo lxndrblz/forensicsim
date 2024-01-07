@@ -7,8 +7,7 @@ jobs:
       steps:
       - uses: actions/checkout@v4
         with:
-          submodules: true
-          lfs: true
+          submodules: recursive
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
