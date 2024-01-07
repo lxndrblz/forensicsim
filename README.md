@@ -53,7 +53,7 @@ either be processed by the Autopsy Plugin or in another application.
 The main parser script can be used like this:
 
 ```bash
-.\dist\ms_teams_parser.exe -f ".\testdata\John Doe\IndexedDB\https_teams.microsoft.com_0.indexeddb.leveldb" -o "C:\Temp\John Doe.json"
+.\dist\ms_teams_parser.exe -f ".\forensicsim-data\john_doe_old_teams\IndexedDB\https_teams.microsoft.com_0.indexeddb.leveldb" -o "john_doe.json"
 ```
 
 Feel free to use the LevelDB files provided in this repository.
