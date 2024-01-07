@@ -7,14 +7,14 @@ from typing import Any
 from bs4 import BeautifulSoup
 import click
 from dataclasses import dataclass, fields, field
-from dataclasses_json import LetterCase, dataclass_json
+from dataclasses_json import LetterCase, dataclass_json, Undefined
 
 from shared import parse_db, write_results_to_json
 from consts import XTRACT_HEADER
 
 
-@dataclass_json(letter_case=LetterCase.CAMEL)
-@dataclass(init=False)
+@dataclass_json(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)
+@dataclass()
 class Meeting:
     client_update_time: str | None = None
     cached_deduplication_key: str | None = None
@@ -26,17 +26,6 @@ class Meeting:
 
     record_type: str | None = "meeting"
 
-    def __init__(self, **kwargs):
-        # allow to pass optional kwargs
-        # https://stackoverflow.com/a/54678706/5755604
-        names = set([f.name for f in fields(self)])
-        for k, v in kwargs.items():
-            if k in names:
-                setattr(self, k, v)
-
-    # def __post_init__(self):
-    #     self.thread_properties["meeting"] = decode_and_loads(self.thread_properties.get("meeting",b""))
-
     def __eq__(self, other):
         return self.cached_deduplication_key == other.cachedDeduplicationKey
 
@@ -44,8 +33,8 @@ class Meeting:
         return hash(("cachedDeduplicationKey", self.cached_deduplication_key))
 
 
-@dataclass_json(letter_case=LetterCase.CAMEL)
-@dataclass(init=False)
+@dataclass_json(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)
+@dataclass()
 class Message:
     attachments: list[Any] = field(default_factory=list)
     client_arrival_time: str | None = None
@@ -65,14 +54,6 @@ class Message:
 
     record_type: str | None = "message"
 
-    def __init__(self, **kwargs):
-        # allow to pass optional kwargs
-        # https://stackoverflow.com/a/54678706/5755604
-        names = set([f.name for f in fields(self)])
-        for k, v in kwargs.items():
-            if k in names:
-                setattr(self, k, v)
-
     def __eq__(self, other):
         return (
             self.creator == other.creator
@@ -83,8 +64,8 @@ class Message:
         return hash(("creator", self.creator, "clientmessageid", self.clientmessageid))
 
 
-@dataclass_json(letter_case=LetterCase.CAMEL)
-@dataclass(init=False)
+@dataclass_json(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)
+@dataclass()
 class Contact:
     display_name: str | None = None
     email: str | None = None
@@ -93,13 +74,6 @@ class Contact:
 
     origin_file: str | None = None
     record_type: str = "contact"
-
-    def __init__(self, **kwargs):
-        # allow to pass optional kwargs
-        names = set([f.name for f in fields(self)])
-        for k, v in kwargs.items():
-            if k in names:
-                setattr(self, k, v)
 
     def __eq__(self, other):
         return self.mri == other.mri
@@ -152,7 +126,7 @@ def _parse_people(people: list[dict]) -> set[Contact]:
     parsed_people = set()
     for p in people:
         kwargs = p.get("value", {}) | {"origin_file": p.get("origin_file")}
-        parsed_people.add(Contact(**kwargs))
+        parsed_people.add(Contact.from_dict(kwargs))
     return parsed_people
 
 
@@ -162,7 +136,7 @@ def _parse_buddies(buddies: list[dict]) -> set[Contact]:
         buddies_of_b = b.get("value", {}).get("buddies", [])
         for b_of_b in buddies_of_b:
             kwargs = {"origin_file": b.get("origin_file")} | b_of_b
-            parsed_buddies.add(Contact(**kwargs))
+            parsed_buddies.add(Contact.from_dict(kwargs))
     return parsed_buddies
 
 
@@ -183,7 +157,7 @@ def _parse_conversations(conversations: list[dict]) -> set[Meeting]:
             kwargs["threadProperties"]["meeting"] = decode_dict(
                 kwargs["threadProperties"]["meeting"]
             )
-            cleaned_conversations.add(Meeting(**kwargs))
+            cleaned_conversations.add(Meeting.from_dict(kwargs))
 
     return cleaned_conversations
 

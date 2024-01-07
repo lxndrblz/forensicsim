@@ -1,26 +1,26 @@
 [
     {
-        "displayName": null,
+        "displayName": "John Doe",
         "email": "JohnDoe@forensics.im",
         "mri": "8:orgid:54dd27a7-fbb0-4bf0-8208-a4b31a578a3f",
         "originFile": "testdata/John Doe/IndexedDB/https_teams.microsoft.com_0.indexeddb.leveldb/000116.ldb",
         "recordType": "contact",
-        "userPrincipalName": null
+        "userPrincipalName": "JohnDoe_forensics.im#EXT#@Forensicsim.onmicrosoft.com"
     },
     {
-        "displayName": null,
+        "displayName": "Admin Im",
         "email": "admin@forensics.im",
         "mri": "8:orgid:8dd7b0c8-8cf0-489b-93d7-2da2f7061f39",
         "originFile": "testdata/John Doe/IndexedDB/https_teams.microsoft.com_0.indexeddb.leveldb/000116.ldb",
         "recordType": "contact",
-        "userPrincipalName": null
+        "userPrincipalName": "admin@Forensicsim.onmicrosoft.com"
     },
     {
-        "displayName": null,
+        "displayName": "Jane Doe",
         "email": "JaneDoe@forensics.im",
         "mri": "8:orgid:e62b7cec-7379-4d6f-aed7-24b48be68a74",
         "originFile": "testdata/John Doe/IndexedDB/https_teams.microsoft.com_0.indexeddb.leveldb/000116.ldb",
         "recordType": "contact",
-        "userPrincipalName": null
+        "userPrincipalName": "JaneDoe_forensics.im#EXT#@Forensicsim.onmicrosoft.com"
     }
 ]
