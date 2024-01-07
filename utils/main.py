@@ -182,17 +182,17 @@ def decode_and_loads(properties):
 
 def _parse_people(people: list[dict]) -> set[Contact]:
     parsed_people = set()
-    for rec in people:
-        kwargs = rec.get("value", {}) | {"origin_file": rec.get("origin_file")}
+    for p in people:
+        kwargs = p.get("value", {}) | {"origin_file": p.get("origin_file")}
         parsed_people.add(Contact(**kwargs))
     return parsed_people
 
 
 def _parse_buddies(buddies: list[dict]) -> set[Contact]:
     parsed_buddies = set()
-    for rec in buddies:
-        kwargs = rec.get("value", {}).get("buddies", {}) | {
-            "origin_file": rec.get("origin_file")
+    for b in buddies:
+        kwargs = b.get("value", {}).get("buddies", {}) | {
+            "origin_file": b.get("origin_file")
         }
         parsed_buddies.add(Contact(**kwargs))
     return parsed_buddies
@@ -200,14 +200,14 @@ def _parse_buddies(buddies: list[dict]) -> set[Contact]:
 
 def _parse_conversations(conversations: list[dict]) -> set[Conversation]:
     cleaned_conversations = set()
-    for rec in conversations:
-        last_message = rec.get("value", {}).get("lastMessage", {})
+    for c in conversations:
+        last_message = c.get("value", {}).get("lastMessage", {})
 
-        kwargs = rec.get("value", {}) | {
+        kwargs = c.get("value", {}) | {
             "cachedDeduplicationKey": last_message.get("cachedDeduplicationKey"),
-            "origin_file": rec.get("origin_file"),
-            "threadProperties": rec.get("threadProperties"),
-            "type": rec.get("type"),
+            "origin_file": c.get("origin_file"),
+            "threadProperties": c.get("threadProperties"),
+            "type": c.get("type"),
         }
 
         if kwargs["type"] == "Meeting" and "meeting" in kwargs["threadProperties"]:
@@ -313,23 +313,27 @@ def parse_reply_chain(reply_chains):
 
 
 def parse_records(records: list[dict]) -> list[dict]:
-    parsed_records = []
+    people, buddies, reply_chains, conversations = [], [], [], []
 
-    # parse people
-    people = [d for d in records if d["store"] == "people"]
-    parsed_records += _parse_people(people)
+    with click.progressbar(
+        records, label="Filtering for people/buddylist/replychains/conversations"
+    ) as record_bar:
+        for r in record_bar:
+            if r.get("store") == "people":
+                people.append(r)
+            elif r.get("store") == "buddylist":
+                buddies.append(r)
+            # elif r.get("store") == "replychains":
+            #     reply_chains.append(r)
+            elif r.get("store") == "conversations":
+                conversations.append(r)
 
-    # parse buddies
-    people = [d for d in records if d["store"] == "buddylist"]
-    parsed_records += _parse_buddies(people)
-
-    # parse text messages, posts, call logs, file transfers
-    reply_chains = [d for d in records if d["store"] == "replychains"]
-    parsed_records += _parse_reply_chains(reply_chains)
-
-    # parse meetings
-    conversations = [d for d in records if d["store"] == "conversations"]
-    parsed_records += _parse_conversations(conversations)
+    parsed_records = [
+        *_parse_people(people),
+        *_parse_buddies(buddies),
+        *_parse_reply_chains(reply_chains),
+        *_parse_conversations(conversations),
+    ]
 
     return [asdict(r) for r in parsed_records]
 
