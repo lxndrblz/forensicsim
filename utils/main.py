@@ -202,6 +202,7 @@ def _parse_reply_chains(reply_chains: list[dict]) -> set[Message]:
                 # TODO: required to check for "reactionInChat" or "reaction"?
                 message_values["record_type"] = "reaction"
 
+            # TODO: Move into dataclass?
             message_kwargs = message_values | {
                 "created_time": decode_timestamp(message_values["createdTime"]),
                 "version": decode_timestamp(message_values["version"]),
