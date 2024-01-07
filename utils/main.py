@@ -188,7 +188,7 @@ def decode_and_loads(properties):
     if isinstance(properties, bytes):
         soup = BeautifulSoup(properties, features="html.parser")
         properties = properties.decode(soup.original_encoding)
-    return json.loads(properties)
+    return json.loads(properties, strict=False)
 
 
 def _parse_people(people: list[dict]) -> set[Contact]:
@@ -326,21 +326,18 @@ def parse_reply_chain(reply_chains):
 def parse_records(records: list[dict]) -> list[dict]:
     people, buddies, reply_chains, conversations = [], [], [], []
 
-    with click.progressbar(
-        records, label="Filtering for people/buddylist/replychains/conversations"
-    ) as record_bar:
-        for r in record_bar:
-            store = r.get("store", "other")
-            if store == "people":
-                people.append(r)
-            elif store == "buddylist":
-                buddies.append(r)
-            # elif r.get("store") == "replychains":
-            #     reply_chains.append(r)
-            elif store == "conversations":
-                conversations.append(r)
+    for r in records:
+        store = r.get("store", "other")
+        if store == "people":
+            people.append(r)
+        elif store == "buddylist":
+            buddies.append(r)
+        elif r.get("store") == "replychains":
+            reply_chains.append(r)
+        elif store == "conversations":
+            conversations.append(r)
 
-    # sort within groups
+    # sort within groups i.e., Contacts, Meetings, Conversations
     parsed_records = (
         sorted(_parse_people(people) | _parse_buddies(buddies))
         + sorted(_parse_reply_chains(reply_chains))
