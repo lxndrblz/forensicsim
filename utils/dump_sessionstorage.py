@@ -42,7 +42,6 @@ def process_db(filepath, output_path):
         raise Exception("Given file path is not a folder. Path: {}".format(filepath))
 
     # convert the database to a python list with nested dictionaries
-    #
     extracted_values = shared.parse_sessionstorage(p)
 
     # write the output to a json file
