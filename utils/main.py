@@ -11,6 +11,7 @@ import shared
 import sys
 
 from dataclasses import dataclass, fields, asdict, field
+from dataclasses_json import LetterCase, config, dataclass_json
 
 MESSAGE_TYPES = {
     "messages": {
@@ -46,17 +47,16 @@ MESSAGE_TYPES = {
     },
 }
 
-# TODO: check better ways of camelcase conversion https://github.com/lidatong/dataclasses-json
 
-
+@dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(init=False)
 class Conversation:
-    clientUpdateTime: str | None = None
-    cachedDeduplicationKey: str | None = None
+    client_update_time: str | None = None
+    cached_deduplication_key: str | None = None
     id: str | None = None
     members: list[dict] | None = None
     record_type: str | None = None
-    threadProperties: dict[str, Any] = field(default_factory=dict)
+    thread_properties: dict[str, Any] = field(default_factory=dict)
     type: str | None = None
     version: float | None = None
 
@@ -69,25 +69,26 @@ class Conversation:
                 setattr(self, k, v)
 
     def __eq__(self, other):
-        return self.cachedDeduplicationKey == other.cachedDeduplicationKey
+        return self.cached_deduplication_key == other.cachedDeduplicationKey
 
     def __hash__(self):
-        return hash(("cachedDeduplicationKey", self.cachedDeduplicationKey))
+        return hash(("cachedDeduplicationKey", self.cached_deduplication_key))
 
 
+@dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(init=False)
 class Message:
     attachments: list[Any] = field(default_factory=list)
-    clientArrivalTime: str | None = None
+    client_arrival_time: str | None = None
     clientmessageid: str | None = None
     clientmessageid: str | None = None
     composetime: str | None = None
     content: str | None = None
     contenttype: str | None = None
-    createdTime: str | None = None
+    created_time: str | None = None
     creator: str | None = None
-    isFromMe: bool | None = None
-    messageKind: str | None = None
+    is_from_me: bool | None = None
+    message_kind: str | None = None
     messagetype: str | None = None
     originalarrivaltime: str | None = None
     properties: dict[str, Any] = field(default_factory=dict)
@@ -112,14 +113,15 @@ class Message:
         return hash(("creator", self.creator, "clientmessageid", self.clientmessageid))
 
 
+@dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(init=False)
 class Contact:
-    displayName: str | None = None
+    display_name: str | None = None
     email: str | None = None
     mri: str | None = None
     origin_file: str | None = None
     record_type: str = "contact"
-    userPrincipalName: str | None = None
+    user_principal_name: str | None = None
 
     def __init__(self, **kwargs):
         # allow to pass optional kwargs
@@ -336,7 +338,7 @@ def parse_records(records: list[dict]) -> list[dict]:
         | _parse_conversations(conversations)
     )
 
-    return [asdict(r) for r in parsed_records]
+    return [r.to_dict() for r in parsed_records]
 
 
 def process_db(input_path: Path, output_path: Path):
