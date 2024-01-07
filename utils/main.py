@@ -191,10 +191,10 @@ def _parse_people(people: list[dict]) -> set[Contact]:
 def _parse_buddies(buddies: list[dict]) -> set[Contact]:
     parsed_buddies = set()
     for b in buddies:
-        kwargs = b.get("value", {}).get("buddies", {}) | {
-            "origin_file": b.get("origin_file")
-        }
-        parsed_buddies.add(Contact(**kwargs))
+        buddies_of_b = b.get("value", {}).get("buddies", [])
+        for b_of_b in buddies_of_b:
+            kwargs = {"origin_file": b.get("origin_file")} | b_of_b
+            parsed_buddies.add(Contact(**kwargs))
     return parsed_buddies
 
 
@@ -319,27 +319,28 @@ def parse_records(records: list[dict]) -> list[dict]:
         records, label="Filtering for people/buddylist/replychains/conversations"
     ) as record_bar:
         for r in record_bar:
-            if r.get("store") == "people":
+            store = r.get("store", "other")
+            if store == "people":
                 people.append(r)
-            elif r.get("store") == "buddylist":
+            elif store == "buddylist":
                 buddies.append(r)
             # elif r.get("store") == "replychains":
             #     reply_chains.append(r)
-            elif r.get("store") == "conversations":
+            elif store == "conversations":
                 conversations.append(r)
 
-    parsed_records = [
-        *_parse_people(people),
-        *_parse_buddies(buddies),
-        *_parse_reply_chains(reply_chains),
-        *_parse_conversations(conversations),
-    ]
+    parsed_records = (
+        _parse_people(people)
+        | _parse_buddies(buddies)
+        | _parse_reply_chains(reply_chains)
+        | _parse_conversations(conversations)
+    )
 
     return [asdict(r) for r in parsed_records]
 
 
 def process_db(input_path: Path, output_path: Path):
-    if not input_path.is_file() or input_path.suffix.lower() != "leveldb":
+    if not input_path.parts[-1].endswith(".leveldb"):
         raise ValueError(f"Expected a leveldb folder. Path: {input_path}")
 
     extracted_values = shared.parse_db(input_path)
@@ -352,7 +353,7 @@ def process_db(input_path: Path, output_path: Path):
     "-f",
     "--filepath",
     type=click.Path(
-        exists=True, readable=True, writable=False, dir_okay=False, path_type=Path
+        exists=True, readable=True, writable=False, dir_okay=True, path_type=Path
     ),
     required=True,
     help="File path to the IndexedDB.",
