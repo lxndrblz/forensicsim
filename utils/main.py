@@ -10,8 +10,8 @@ import click
 import shared
 import sys
 
-from dataclasses import dataclass, fields, asdict, field
-from dataclasses_json import LetterCase, config, dataclass_json
+from dataclasses import dataclass, fields, field
+from dataclasses_json import LetterCase, dataclass_json
 
 MESSAGE_TYPES = {
     "messages": {
@@ -50,15 +50,16 @@ MESSAGE_TYPES = {
 
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(init=False)
-class Conversation:
+class Meeting:
     client_update_time: str | None = None
     cached_deduplication_key: str | None = None
     id: str | None = None
     members: list[dict] | None = None
-    record_type: str | None = None
     thread_properties: dict[str, Any] = field(default_factory=dict)
     type: str | None = None
     version: float | None = None
+
+    record_type: str | None = "meeting"
 
     def __init__(self, **kwargs):
         # allow to pass optional kwargs
@@ -67,6 +68,9 @@ class Conversation:
         for k, v in kwargs.items():
             if k in names:
                 setattr(self, k, v)
+
+    # def __post_init__(self):
+    #     self.thread_properties["meeting"] = decode_and_loads(self.thread_properties.get("meeting",b""))
 
     def __eq__(self, other):
         return self.cached_deduplication_key == other.cachedDeduplicationKey
@@ -92,8 +96,9 @@ class Message:
     messagetype: str | None = None
     originalarrivaltime: str | None = None
     properties: dict[str, Any] = field(default_factory=dict)
-    record_type: str | None = None
     version: str | None = None
+
+    record_type: str | None = "message"
 
     def __init__(self, **kwargs):
         # allow to pass optional kwargs
@@ -119,9 +124,10 @@ class Contact:
     display_name: str | None = None
     email: str | None = None
     mri: str | None = None
+    user_principal_name: str | None = None
+
     origin_file: str | None = None
     record_type: str = "contact"
-    user_principal_name: str | None = None
 
     def __init__(self, **kwargs):
         # allow to pass optional kwargs
@@ -136,11 +142,14 @@ class Contact:
     def __hash__(self):
         return hash(("mri", self.mri))
 
+    def __lt__(self, other):
+        return self.mri < other.mri
+
 
 def map_updated_teams_keys(value):
     # Seems like Microsoft discovered duck typing
     # set the new keys to the old values too
-    value["composetime"] = convert_time_stamps(value["id"])
+    # value["composetime"] = convert_time_stamps(value["id"])
     value["createdTime"] = value["id"]
     value["isFromMe"] = value["isSentByCurrentUser"]
     value["originalarrivaltime"] = value["originalArrivalTime"]
@@ -200,7 +209,7 @@ def _parse_buddies(buddies: list[dict]) -> set[Contact]:
     return parsed_buddies
 
 
-def _parse_conversations(conversations: list[dict]) -> set[Conversation]:
+def _parse_conversations(conversations: list[dict]) -> set[Meeting]:
     cleaned_conversations = set()
     for c in conversations:
         last_message = c.get("value", {}).get("lastMessage", {})
@@ -213,11 +222,11 @@ def _parse_conversations(conversations: list[dict]) -> set[Conversation]:
         }
 
         if kwargs["type"] == "Meeting" and "meeting" in kwargs["threadProperties"]:
+            # TODO: Move into dataclass?
             kwargs["threadProperties"]["meeting"] = decode_and_loads(
                 kwargs["threadProperties"]["meeting"]
             )
-            kwargs["record_type"] = "meeting"
-            cleaned_conversations.add(Conversation(**kwargs))
+            cleaned_conversations.add(Meeting(**kwargs))
 
     return cleaned_conversations
 
@@ -331,13 +340,12 @@ def parse_records(records: list[dict]) -> list[dict]:
             elif store == "conversations":
                 conversations.append(r)
 
+    # sort within groups
     parsed_records = (
-        _parse_people(people)
-        | _parse_buddies(buddies)
-        | _parse_reply_chains(reply_chains)
-        | _parse_conversations(conversations)
+        sorted(_parse_people(people) | _parse_buddies(buddies))
+        + sorted(_parse_reply_chains(reply_chains))
+        + sorted(_parse_conversations(conversations))
     )
-
     return [r.to_dict() for r in parsed_records]
 
 
