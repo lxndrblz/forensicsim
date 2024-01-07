@@ -246,7 +246,7 @@ def parse_localstorage(filepath):
     extracted_values = []
     for record in local_store.iter_all_records():
         try:
-            extracted_values.append(json.loads(record.value))
+            extracted_values.append(json.loads(record.value, strict=False))
         except json.decoder.JSONDecodeError:
             continue
     return extracted_values
