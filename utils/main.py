@@ -337,16 +337,8 @@ def parse_records(records: list[dict]) -> list[dict]:
 
 
 def process_db(filepath, output_path):
-    # Do some basic error handling
-    if not filepath.endswith("leveldb"):
+    if not filepath.is_file() or filepath.suffix.lower() != "leveldb":
         raise ValueError(f"Expected a leveldb folder. Path: {filepath}")
-
-    p = Path(filepath)
-    if not p.exists():
-        raise FileNotFoundError(f"Given file path does not exist. Path: {filepath}")
-
-    if not p.is_dir():
-        raise NotADirectoryError(f"Given file path is not a folder. Path: {filepath}")
 
     extracted_values = shared.parse_db(filepath)
     parsed_records = parse_records(extracted_values)
@@ -354,9 +346,21 @@ def process_db(filepath, output_path):
 
 
 @click.command()
-@click.option("-f", "--filepath", required=True, help="File path to the IndexedDB.")
 @click.option(
-    "-o", "--outputpath", required=True, help="File path to the processed output."
+    "-f",
+    "--filepath",
+    type=click.Path(
+        exists=True, readable=True, writable=False, dir_okay=False, path_type=Path
+    ),
+    required=True,
+    help="File path to the IndexedDB.",
+)
+@click.option(
+    "-o",
+    "--outputpath",
+    type=click.Path(writable=True, path_type=Path),
+    required=True,
+    help="File path to the processed output.",
 )
 def cli(filepath, outputpath):
     click.echo(XTRACT_HEADER)
