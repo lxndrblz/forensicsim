@@ -6,7 +6,7 @@ from typing import Any
 
 from bs4 import BeautifulSoup
 import click
-from dataclasses import dataclass, fields, field
+from dataclasses import dataclass, field
 from dataclasses_json import LetterCase, dataclass_json, Undefined
 
 from shared import parse_db, write_results_to_json
@@ -32,13 +32,16 @@ class Meeting:
     def __hash__(self):
         return hash(("cachedDeduplicationKey", self.cached_deduplication_key))
 
+    def __lt__(self, other):
+        return self.cached_deduplication_key < other.cached_deduplication_key
+
 
 @dataclass_json(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)
 @dataclass()
 class Message:
     attachments: list[Any] = field(default_factory=list)
+    cached_deduplication_key: str | None = None
     client_arrival_time: str | None = None
-    clientmessageid: str | None = None
     clientmessageid: str | None = None
     composetime: str | None = None
     content: str | None = None
@@ -52,7 +55,12 @@ class Message:
     properties: dict[str, Any] = field(default_factory=dict)
     version: str | None = None
 
+    origin_file: str | None = None
     record_type: str | None = "message"
+
+    def __post_init__(self):
+        if self.cached_deduplication_key is None:
+            self.cached_deduplication_key = self.creator + self.clientmessageid
 
     def __eq__(self, other):
         return (
@@ -61,7 +69,10 @@ class Message:
         )
 
     def __hash__(self):
-        return hash(("creator", self.creator, "clientmessageid", self.clientmessageid))
+        return hash(("cachedDeduplicationKey", self.cached_deduplication_key))
+
+    def __lt__(self, other):
+        return self.cached_deduplication_key < other.cached_deduplication_key
 
 
 @dataclass_json(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)
@@ -85,17 +96,15 @@ class Contact:
         return self.mri < other.mri
 
 
-def map_updated_teams_keys(value):
-    # Seems like Microsoft discovered duck typing
-    # set the new keys to the old values too
-    # value["composetime"] = convert_time_stamps(value["id"])
-    value["createdTime"] = value["id"]
-    value["isFromMe"] = value["isSentByCurrentUser"]
-    value["originalarrivaltime"] = value["originalArrivalTime"]
-    value["clientmessageid"] = value["clientMessageId"]
-    value["contenttype"] = value["contentType"]
-    value["messagetype"] = value["messageType"]
-    return value
+LUT_KEYS_MSTEAMS_2_0 = {
+    "messageMap": "messages",
+    "id": "created_time",
+    "isSentByCurrentUser": "isFromMe",
+    "originalArrivalTime": "originalarrivaltime",
+    "clientMessageId": "clientmessageid",
+    "contentType": "contenttype",
+    "messageType": "messagetype",
+}
 
 
 def strip_html_tags(value):
@@ -153,7 +162,6 @@ def _parse_conversations(conversations: list[dict]) -> set[Meeting]:
         }
 
         if kwargs["type"] == "Meeting" and "meeting" in kwargs["threadProperties"]:
-            # TODO: Move into dataclass?
             kwargs["threadProperties"]["meeting"] = decode_dict(
                 kwargs["threadProperties"]["meeting"]
             )
@@ -164,94 +172,38 @@ def _parse_conversations(conversations: list[dict]) -> set[Meeting]:
 
 def _parse_reply_chains(reply_chains: list[dict]) -> set[Message]:
     cleaned_reply_chains = set()
+
+    for rc in reply_chains:
+        kwargs = rc.get("value", {}) | {"origin_file": rc.get("origin_file")}
+
+        # Reassign new keys to old identifiers
+        keys = [LUT_KEYS_MSTEAMS_2_0.get(k, k) for k in kwargs.keys()]
+        kwargs.update(zip(keys, kwargs.values()))
+
+        for message_values in kwargs.get("messages", {}).values():
+            message_properties = message_values.get("properties", {})
+            # TODO: Required to check fo "RichText/Html" "Text"?
+
+            # general
+            if "links" in message_values:
+                message_values["links"] = decode_dict(message_values["links"])
+            if "files" in message_values:
+                message_values["files"] = decode_dict(message_values["files"])
+            if "content" in message_values:
+                message_values["content"] = strip_html_tags(message_values["content"])
+
+            # specific
+            if "call-log" in message_properties:
+                message_values["record_type"] = "call"
+                message_properties["call-log"] = decode_dict(
+                    message_properties["call-log"]
+                )
+            if "activity" in message_properties:
+                # TODO: required to check for "reactionInChat" or "reaction"?
+                message_values["record_type"] = "reaction"
+
+            cleaned_reply_chains.add(Message.from_dict(message_values))
     return cleaned_reply_chains
-
-
-def parse_reply_chain(reply_chains):
-    cleaned = []
-    for reply_chain in reply_chains:
-        value = reply_chain["value"]
-        # The way of accessing a the nested messages is different depending on the teams version -> check for both
-        message_keys = ["messageMap", "messages"]
-        for message_key in message_keys:
-            if message_key in value:
-                message = value[message_key]
-                for key, value in message.items():
-                    # parse as a normal chat message
-                    try:
-                        x = extract_fields(value, message_key)
-                        # reassign the new keys to the old identifiers
-                        if message_key == "messageMap":
-                            x = map_updated_teams_keys(x)
-                        x["origin_file"] = reply_chain["origin_file"]
-                        # Files send without any description will be of type text
-                        # Newer version uses duck typed key
-                        if "messagetype" in x and (
-                            x["messagetype"] == "RichText/Html"
-                            or x["messagetype"] == "Text"
-                        ):
-                            # Get the call logs
-
-                            if "call-log" in x["properties"]:
-                                # call logs are string escaped
-                                x["properties"]["call-log"] = decode_dict(
-                                    value["properties"]["call-log"]
-                                )
-                                x["record_type"] = "call"
-                            # Get the reactions from the chat
-                            elif "activity" in x["properties"]:
-                                # reactionInChat are for personal conversations, reactions are for posts or comments
-                                if (
-                                    x["properties"]["activity"]["activityType"]
-                                    == "reactionInChat"
-                                    or x["properties"]["activity"]["activityType"]
-                                    == "reaction"
-                                ):
-                                    x["record_type"] = "reaction"
-                            # normal message, posts, file transfers
-                            else:
-                                x["content"] = strip_html_tags(x["content"])
-
-                                x["record_type"] = "message"
-
-                                # handle string escaped json arrays within properties
-                                if "links" in x["properties"]:
-                                    x["properties"]["links"] = decode_dict(
-                                        x["properties"]["links"]
-                                    )
-                                if "files" in x["properties"]:
-                                    x["properties"]["files"] = decode_dict(
-                                        x["properties"]["files"]
-                                    )
-                            # convert the timestamps
-                            x["createdTime"] = decode_timestamp(x["createdTime"])
-                            x["version"] = decode_timestamp(x["version"])
-                            # manually construct the cachedDeduplicationKey, because not every replychain appears to have this key.
-                            # cachedDeduplicationKey look like 8:orgid:54dd27a7-fbb0-4bf0-8208-a4b31a578a3f6691174965251523000
-                            # They are composed of the:
-                            # -> creator 8:orgid:54dd27a7-fbb0-4bf0-8208-a4b31a578a3f
-                            # -> clientmessageid 6691174965251523000
-                            if (
-                                x["creator"] is not None
-                                and x["clientmessageid"] is not None
-                                and "record_type" in x
-                            ):
-                                x["cachedDeduplicationKey"] = str(
-                                    x["creator"] + x["clientmessageid"]
-                                )
-                                cleaned.append(x)
-                        # Other types include ThreadActivity/TopicUpdate and ThreadActivity/AddMember
-                        # -> ThreadActivity/TopicUpdate occurs for meeting updates
-                        # -> ThreadActivity/AddMember occurs when someone gets added to a chat
-                    except UnicodeDecodeError or KeyError or NameError as e:
-                        print(
-                            "Could not decode the following item in the reply chain (output is not deduplicated)."
-                        )
-                        print("\t ", value)
-
-    # # Deduplicate based on cachedDeduplicationKey, as messages appear often multiple times within
-    # cleaned = deduplicate(cleaned, "cachedDeduplicationKey")
-    return cleaned
 
 
 def parse_records(records: list[dict]) -> list[dict]:
@@ -263,7 +215,7 @@ def parse_records(records: list[dict]) -> list[dict]:
             people.append(r)
         elif store == "buddylist":
             buddies.append(r)
-        elif r.get("store") == "replychains":
+        elif store == "replychains":
             reply_chains.append(r)
         elif store == "conversations":
             conversations.append(r)
