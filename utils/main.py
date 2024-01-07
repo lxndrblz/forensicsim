@@ -1,51 +1,16 @@
-from typing import Any
-import json
 from datetime import datetime
+import json
 from pathlib import Path
+import sys
+from typing import Any
 
-from consts import XTRACT_HEADER
 from bs4 import BeautifulSoup
 import click
-
-import shared
-import sys
-
 from dataclasses import dataclass, fields, field
 from dataclasses_json import LetterCase, dataclass_json
 
-MESSAGE_TYPES = {
-    "messages": {
-        "creator",
-        "conversationId",
-        "content",
-        "composetime",
-        "originalarrivaltime",
-        "clientArrivalTime",
-        "isFromMe",
-        "createdTime",
-        "clientmessageid",
-        "contenttype",
-        "messagetype",
-        "version",
-        "messageKind",
-        "properties",
-        "attachments",
-    },
-    "messageMap": {
-        "creator",
-        "conversationId",
-        "content",
-        "id",
-        "originalArrivalTime",
-        "clientArrivalTime",
-        "isSentByCurrentUser",
-        "clientMessageId",
-        "contentType",
-        "messageType",
-        "version",
-        "properties",
-    },
-}
+from shared import parse_db, write_results_to_json
+from consts import XTRACT_HEADER
 
 
 @dataclass_json(letter_case=LetterCase.CAMEL)
@@ -165,7 +130,7 @@ def strip_html_tags(value):
     return soup.get_text()
 
 
-def convert_time_stamps(content_utf8_encoded):
+def decode_timestamp(content_utf8_encoded):
     # timestamp appear in epoch format with milliseconds alias currentmillis
     # Convert data to neat timestamp
     converted_time_datetime = datetime.utcfromtimestamp(
@@ -176,15 +141,7 @@ def convert_time_stamps(content_utf8_encoded):
     return str(converted_time_string)
 
 
-def extract_fields(record, keys):
-    keys_by_message_type = MESSAGE_TYPES[keys]
-    extracted_record = {
-        key: record[key] for key in record.keys() & keys_by_message_type
-    }
-    return extracted_record
-
-
-def decode_and_loads(properties):
+def decode_dict(properties):
     if isinstance(properties, bytes):
         soup = BeautifulSoup(properties, features="html.parser")
         properties = properties.decode(soup.original_encoding)
@@ -223,7 +180,7 @@ def _parse_conversations(conversations: list[dict]) -> set[Meeting]:
 
         if kwargs["type"] == "Meeting" and "meeting" in kwargs["threadProperties"]:
             # TODO: Move into dataclass?
-            kwargs["threadProperties"]["meeting"] = decode_and_loads(
+            kwargs["threadProperties"]["meeting"] = decode_dict(
                 kwargs["threadProperties"]["meeting"]
             )
             cleaned_conversations.add(Meeting(**kwargs))
@@ -263,7 +220,7 @@ def parse_reply_chain(reply_chains):
 
                             if "call-log" in x["properties"]:
                                 # call logs are string escaped
-                                x["properties"]["call-log"] = decode_and_loads(
+                                x["properties"]["call-log"] = decode_dict(
                                     value["properties"]["call-log"]
                                 )
                                 x["record_type"] = "call"
@@ -285,16 +242,16 @@ def parse_reply_chain(reply_chains):
 
                                 # handle string escaped json arrays within properties
                                 if "links" in x["properties"]:
-                                    x["properties"]["links"] = decode_and_loads(
+                                    x["properties"]["links"] = decode_dict(
                                         x["properties"]["links"]
                                     )
                                 if "files" in x["properties"]:
-                                    x["properties"]["files"] = decode_and_loads(
+                                    x["properties"]["files"] = decode_dict(
                                         x["properties"]["files"]
                                     )
                             # convert the timestamps
-                            x["createdTime"] = convert_time_stamps(x["createdTime"])
-                            x["version"] = convert_time_stamps(x["version"])
+                            x["createdTime"] = decode_timestamp(x["createdTime"])
+                            x["version"] = decode_timestamp(x["version"])
                             # manually construct the cachedDeduplicationKey, because not every replychain appears to have this key.
                             # cachedDeduplicationKey look like 8:orgid:54dd27a7-fbb0-4bf0-8208-a4b31a578a3f6691174965251523000
                             # They are composed of the:
@@ -350,9 +307,9 @@ def process_db(input_path: Path, output_path: Path):
     if not input_path.parts[-1].endswith(".leveldb"):
         raise ValueError(f"Expected a leveldb folder. Path: {input_path}")
 
-    extracted_values = shared.parse_db(input_path)
+    extracted_values = parse_db(input_path)
     parsed_records = parse_records(extracted_values)
-    shared.write_results_to_json(parsed_records, output_path)
+    write_results_to_json(parsed_records, output_path)
 
 
 @click.command()
