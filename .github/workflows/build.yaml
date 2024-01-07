@@ -17,4 +17,6 @@ jobs:
       - name: Build binary 🔢
         run:  pyinstaller "main.spec"
       - name: Run conversion ↩️
-        run: .\dist\ms_teams_parser.exe -f ".\testdata\John Doe\IndexedDB\https_teams.microsoft.com_0.indexeddb.leveldb" -o "output.json"
+        run: .\dist\ms_teams_parser.exe -f ".\testdata\John Doe\IndexedDB\https_teams.microsoft.com_0.indexeddb.leveldb" -o "current_output.json"
+      # - name: Calculate diff 👽
+      #   run: git diff --no-index --word-diff expected_output/john_doe.json current_output.json
