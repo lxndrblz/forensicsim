@@ -44,6 +44,7 @@ class Message:
     client_arrival_time: Optional[str] = None
     clientmessageid: Optional[str] = None
     composetime: Optional[str] = None
+    conversation_id: Optional[str] = None
     content: Optional[str] = None
     contenttype: Optional[str] = None
     created_time: Optional[str] = None
@@ -98,7 +99,7 @@ class Contact:
 
 LUT_KEYS_MSTEAMS_2_0 = {
     "messageMap": "messages",
-    "id": "created_time",
+    "id": "createdTime",
     "isSentByCurrentUser": "isFromMe",
     "originalArrivalTime": "originalarrivaltime",
     "clientMessageId": "clientmessageid",
@@ -174,9 +175,8 @@ def _parse_reply_chains(reply_chains: list[dict]) -> set[Message]:
     cleaned_reply_chains = set()
 
     for rc in reply_chains:
-        kwargs = rc.get("value", {}) | {"origin_file": rc.get("origin_file")}
-
         # Reassign new keys to old identifiers
+        kwargs = rc.get("value", {})
         keys = [LUT_KEYS_MSTEAMS_2_0.get(k, k) for k in kwargs.keys()]
         kwargs.update(zip(keys, kwargs.values()))
 
@@ -202,7 +202,13 @@ def _parse_reply_chains(reply_chains: list[dict]) -> set[Message]:
                 # TODO: required to check for "reactionInChat" or "reaction"?
                 message_values["record_type"] = "reaction"
 
-            cleaned_reply_chains.add(Message.from_dict(message_values))
+            message_kwargs = message_values | {
+                "created_time": decode_timestamp(message_values["createdTime"]),
+                "version": decode_timestamp(message_values["version"]),
+                "origin_file": rc.get("origin_file"),
+            }
+
+            cleaned_reply_chains.add(Message.from_dict(message_kwargs))
     return cleaned_reply_chains
 
 
@@ -222,9 +228,10 @@ def parse_records(records: list[dict]) -> list[dict]:
 
     # sort within groups i.e., Contacts, Meetings, Conversations
     parsed_records = (
-        sorted(_parse_people(people) | _parse_buddies(buddies))
-        + sorted(_parse_reply_chains(reply_chains))
-        + sorted(_parse_conversations(conversations))
+        _parse_people(people)
+        | _parse_buddies(buddies)
+        | _parse_reply_chains(reply_chains)
+        | _parse_conversations(conversations)
     )
     return [r.to_dict() for r in parsed_records]
 
