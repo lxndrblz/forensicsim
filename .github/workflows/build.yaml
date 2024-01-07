@@ -1,0 +1,22 @@
+on:
+    push:
+jobs:
+    build:
+      name: Build exectuable 📦
+      runs-on: windows-latest
+      steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+      - name: Install dependencies
+        run: |
+              python -m pip install --upgrade pip
+              python -m pip install -r requirements.txt pyinstaller
+      - name: Build binary 🔢
+        run:  pyinstaller "main.spec"
+      - name: Run conversion ↩️
+        run: .\dist\ms_teams_parser.exe -f ".\testdata\John Doe\IndexedDB\https_teams.microsoft.com_0.indexeddb.leveldb" -o "current_output.json"
+      # - name: Calculate diff 👽
+      #   run: git diff --no-index --word-diff expected_output/john_doe.json current_output.json
