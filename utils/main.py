@@ -315,8 +315,6 @@ def parse_reply_chain(reply_chains):
 def parse_records(records: list[dict]) -> list[dict]:
     parsed_records = []
 
-    # Parse the records based on the store they are in.
-
     # parse people
     people = [d for d in records if d["store"] == "people"]
     parsed_records += _parse_people(people)
@@ -336,11 +334,11 @@ def parse_records(records: list[dict]) -> list[dict]:
     return [asdict(r) for r in parsed_records]
 
 
-def process_db(filepath, output_path):
-    if not filepath.is_file() or filepath.suffix.lower() != "leveldb":
-        raise ValueError(f"Expected a leveldb folder. Path: {filepath}")
+def process_db(input_path: Path, output_path: Path):
+    if not input_path.is_file() or input_path.suffix.lower() != "leveldb":
+        raise ValueError(f"Expected a leveldb folder. Path: {input_path}")
 
-    extracted_values = shared.parse_db(filepath)
+    extracted_values = shared.parse_db(input_path)
     parsed_records = parse_records(extracted_values)
     shared.write_results_to_json(parsed_records, output_path)
 
@@ -362,11 +360,11 @@ def process_db(filepath, output_path):
     required=True,
     help="File path to the processed output.",
 )
-def cli(filepath, outputpath):
+def process_cmd(filepath, outputpath):
     click.echo(XTRACT_HEADER)
     process_db(filepath, outputpath)
     sys.exit(0)
 
 
 if __name__ == "__main__":
-    cli()
+    process_cmd()
