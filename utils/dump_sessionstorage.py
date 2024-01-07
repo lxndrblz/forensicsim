@@ -32,14 +32,17 @@ import shared
 
 
 def process_db(filepath, output_path):
+    # Do some basic error handling
+
     p = Path(filepath)
     if not p.exists():
-        raise FileNotFoundError(f"Given file path does not exist. Path: {filepath}")
+        raise Exception("Given file path does not exists. Path: {}".format(filepath))
 
     if not p.is_dir():
-        raise NotADirectoryError(f"Given file path is not a folder. Path: {filepath}")
+        raise Exception("Given file path is not a folder. Path: {}".format(filepath))
 
     # convert the database to a python list with nested dictionaries
+    #
     extracted_values = shared.parse_sessionstorage(p)
 
     # write the output to a json file
