@@ -1,41 +1,16 @@
-"""
-MIT License
-
-Copyright (c) 2021 Alexander Bilz
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-"""
-
 from typing import Any
-import argparse
 import json
 from datetime import datetime
 from pathlib import Path
 
-import pyfiglet
-import pyfiglet.fonts
+from consts import XTRACT_HEADER
 from bs4 import BeautifulSoup
+import click
 
 import shared
 import sys
 
-from dataclasses import dataclass, fields, asdict
+from dataclasses import dataclass, fields, asdict, field
 
 MESSAGE_TYPES = {
     "messages": {
@@ -71,15 +46,17 @@ MESSAGE_TYPES = {
     },
 }
 
+# TODO: check better ways of camelcase conversion https://github.com/lidatong/dataclasses-json
+
 
 @dataclass(init=False)
 class Conversation:
     clientUpdateTime: str | None = None
     cachedDeduplicationKey: str | None = None
     id: str | None = None
-    members: list[dict] | None = []
+    members: list[dict] | None = None
     record_type: str | None = None
-    threadProperties: dict[str, Any] | None = {}
+    threadProperties: dict[str, Any] = field(default_factory=dict)
     type: str | None = None
     version: float | None = None
 
@@ -100,7 +77,7 @@ class Conversation:
 
 @dataclass(init=False)
 class Message:
-    attachments: list[Any] | None = []
+    attachments: list[Any] = field(default_factory=list)
     clientArrivalTime: str | None = None
     clientmessageid: str | None = None
     clientmessageid: str | None = None
@@ -113,7 +90,7 @@ class Message:
     messageKind: str | None = None
     messagetype: str | None = None
     originalarrivaltime: str | None = None
-    properties: dict[str, Any] | None = {}
+    properties: dict[str, Any] = field(default_factory=dict)
     record_type: str | None = None
     version: str | None = None
 
@@ -203,7 +180,7 @@ def decode_and_loads(properties):
     return json.loads(properties)
 
 
-def _parse_people(people: list[dict]) -> set(Contact):
+def _parse_people(people: list[dict]) -> set[Contact]:
     parsed_people = set()
     for rec in people:
         kwargs = rec.get("value", {}) | {"origin_file": rec.get("origin_file")}
@@ -211,7 +188,7 @@ def _parse_people(people: list[dict]) -> set(Contact):
     return parsed_people
 
 
-def _parse_buddies(buddies: list[dict]) -> set(Contact):
+def _parse_buddies(buddies: list[dict]) -> set[Contact]:
     parsed_buddies = set()
     for rec in buddies:
         kwargs = rec.get("value", {}).get("buddies", {}) | {
@@ -221,7 +198,7 @@ def _parse_buddies(buddies: list[dict]) -> set(Contact):
     return parsed_buddies
 
 
-def _parse_conversations(conversations: list[dict]) -> set(Conversation):
+def _parse_conversations(conversations: list[dict]) -> set[Conversation]:
     cleaned_conversations = set()
     for rec in conversations:
         last_message = rec.get("value", {}).get("lastMessage", {})
@@ -243,7 +220,7 @@ def _parse_conversations(conversations: list[dict]) -> set(Conversation):
     return cleaned_conversations
 
 
-def _parse_reply_chains(reply_chains: list[dict]) -> set(Message):
+def _parse_reply_chains(reply_chains: list[dict]) -> set[Message]:
     cleaned_reply_chains = set()
     return cleaned_reply_chains
 
@@ -371,39 +348,19 @@ def process_db(filepath, output_path):
     if not p.is_dir():
         raise NotADirectoryError(f"Given file path is not a folder. Path: {filepath}")
 
-    # convert the database to a python list with nested dictionaries
     extracted_values = shared.parse_db(filepath)
-
-    # parse records
     parsed_records = parse_records(extracted_values)
-
-    # write the output to a json file
     shared.write_results_to_json(parsed_records, output_path)
 
 
-def run(args):
-    process_db(args.filepath, args.outputpath)
-
-
-def parse_cmdline():
-    description = "Forensics.im Xtract Tool"
-    parser = argparse.ArgumentParser(description=description)
-    required_group = parser.add_argument_group("required arguments")
-    required_group.add_argument(
-        "-f", "--filepath", required=True, help="File path to the IndexedDB."
-    )
-    required_group.add_argument(
-        "-o", "--outputpath", required=True, help="File path to the processed output."
-    )
-    args = parser.parse_args()
-    return args
-
-
-def cli():
-    header = pyfiglet.figlet_format("Forensics.im Xtract Tool")
-    print(header)
-    args = parse_cmdline()
-    run(args)
+@click.command()
+@click.option("-f", "--filepath", required=True, help="File path to the IndexedDB.")
+@click.option(
+    "-o", "--outputpath", required=True, help="File path to the processed output."
+)
+def cli(filepath, outputpath):
+    click.echo(XTRACT_HEADER)
+    process_db(filepath, outputpath)
     sys.exit(0)
 
 
