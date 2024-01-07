@@ -24,56 +24,45 @@ SOFTWARE.
 
 from pathlib import Path
 
-import argparse
-import pyfiglet
-import pyfiglet.fonts
+import click
 
-import shared
+from consts import DUMP_HEADER
+from shared import parse_db, write_results_to_json
 
 
-def process_db(filepath, output_path):
+def process_db(input_path, output_path):
     # Do some basic error handling
-    if not filepath.endswith("leveldb"):
-        raise Exception("Expected a leveldb folder. Path: {}".format(filepath))
-
-    p = Path(filepath)
-    if not p.exists():
-        raise Exception("Given file path does not exists. Path: {}".format(filepath))
-
-    if not p.is_dir():
-        raise Exception("Given file path is not a folder. Path: {}".format(filepath))
+    if not input_path.parts[-1].endswith(".leveldb"):
+        raise ValueError(f"Expected a leveldb folder. Path: {input_path}")
 
     # convert the database to a python list with nested dictionaries
-    extracted_values = shared.parse_db(filepath, True)
+    extracted_values = parse_db(input_path, do_not_filter=True)
 
     # write the output to a json file
-    shared.write_results_to_json(extracted_values, output_path)
+    write_results_to_json(extracted_values, output_path)
 
 
-def run(args):
-    process_db(args.filepath, args.outputpath)
-
-
-def parse_cmdline():
-    description = "Forensics.im Dump Tool"
-    parser = argparse.ArgumentParser(description=description)
-    required_group = parser.add_argument_group("required arguments")
-    required_group.add_argument(
-        "-f", "--filepath", required=True, help="File path to the IndexedDB."
-    )
-    required_group.add_argument(
-        "-o", "--outputpath", required=True, help="File path to the processed output."
-    )
-    args = parser.parse_args()
-    return args
-
-
-def cli():
-    header = pyfiglet.figlet_format("Forensics.im Dump Tool")
-    print(header)
-    args = parse_cmdline()
-    run(args)
+@click.command()
+@click.option(
+    "-f",
+    "--filepath",
+    type=click.Path(
+        exists=True, readable=True, writable=False, dir_okay=True, path_type=Path
+    ),
+    required=True,
+    help="File path to the IndexedDB.",
+)
+@click.option(
+    "-o",
+    "--outputpath",
+    type=click.Path(writable=True, path_type=Path),
+    required=True,
+    help="File path to the processed output.",
+)
+def process_cmd(filepath, outputpath):
+    click.echo(DUMP_HEADER)
+    process_db(filepath, outputpath)
 
 
 if __name__ == "__main__":
-    cli()
+    process_cmd()

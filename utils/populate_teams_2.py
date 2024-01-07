@@ -7,9 +7,10 @@ from time import sleep
 import click
 import pause
 import pyautogui
-import pyfiglet
+
 from pywinauto import keyboard
 
+from consts import UTIL_HEADER
 # Teams could be started from script, but requires change owner permissions. Better to launch Teams 2.0 first and
 # then set the focus to the application.
 # os.startfile("C:/Program Files/WindowsApps/MicrosoftTeams_21197.1103.908.5982_x64__8wekyb3d8bbwe/msteams.exe")
@@ -155,8 +156,7 @@ def populate_data_teams(all_data_to_populate, account):
 )
 @click.option("--account", "-a", required=True, default="0", help="Account to populate")
 def cli(filepath, account):
-    header = pyfiglet.figlet_format("Forensics.im Util")
-    click.echo(header)
+    click.echo(UTIL_HEADER)
     with click.open_file(filepath, encoding="utf-8") as f:
         data = json.load(f)
         populate_data_teams(data, account)
