@@ -2,7 +2,7 @@ from datetime import datetime
 import json
 from pathlib import Path
 import sys
-from typing import Any
+from typing import Any, Optional
 
 from bs4 import BeautifulSoup
 import click
@@ -16,15 +16,15 @@ from consts import XTRACT_HEADER
 @dataclass_json(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)
 @dataclass()
 class Meeting:
-    client_update_time: str | None = None
-    cached_deduplication_key: str | None = None
-    id: str | None = None
-    members: list[dict] | None = None
+    client_update_time: Optional[str] = None
+    cached_deduplication_key: Optional[str] = None
+    id: Optional[str] = None
+    members: Optional[list[dict]] = None
     thread_properties: dict[str, Any] = field(default_factory=dict)
-    type: str | None = None
-    version: float | None = None
+    type: Optional[str] = None
+    version: Optional[float] = None
 
-    record_type: str | None = "meeting"
+    record_type: Optional[str] = "meeting"
 
     def __eq__(self, other):
         return self.cached_deduplication_key == other.cachedDeduplicationKey
@@ -40,23 +40,23 @@ class Meeting:
 @dataclass()
 class Message:
     attachments: list[Any] = field(default_factory=list)
-    cached_deduplication_key: str | None = None
-    client_arrival_time: str | None = None
-    clientmessageid: str | None = None
-    composetime: str | None = None
-    content: str | None = None
-    contenttype: str | None = None
-    created_time: str | None = None
-    creator: str | None = None
-    is_from_me: bool | None = None
-    message_kind: str | None = None
-    messagetype: str | None = None
-    originalarrivaltime: str | None = None
+    cached_deduplication_key: Optional[str] = None
+    client_arrival_time: Optional[str] = None
+    clientmessageid: Optional[str] = None
+    composetime: Optional[str] = None
+    content: Optional[str] = None
+    contenttype: Optional[str] = None
+    created_time: Optional[str] = None
+    creator: Optional[str] = None
+    is_from_me: Optional[bool] = None
+    message_kind: Optional[str] = None
+    messagetype: Optional[str] = None
+    originalarrivaltime: Optional[str] = None
     properties: dict[str, Any] = field(default_factory=dict)
-    version: str | None = None
+    version: Optional[str] = None
 
-    origin_file: str | None = None
-    record_type: str | None = "message"
+    origin_file: Optional[str] = None
+    record_type: Optional[str] = "message"
 
     def __post_init__(self):
         if self.cached_deduplication_key is None:
@@ -78,12 +78,12 @@ class Message:
 @dataclass_json(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)
 @dataclass()
 class Contact:
-    display_name: str | None = None
-    email: str | None = None
-    mri: str | None = None
-    user_principal_name: str | None = None
+    display_name: Optional[str] = None
+    email: Optional[str] = None
+    mri: Optional[str] = None
+    user_principal_name: Optional[str] = None
 
-    origin_file: str | None = None
+    origin_file: Optional[str] = None
     record_type: str = "contact"
 
     def __eq__(self, other):
