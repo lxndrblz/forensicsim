@@ -21,7 +21,7 @@ jobs:
       run:  pyinstaller "main.spec"
     - name: Zip files 🗜️
       run: |
-            cp utils/Forensicsim_Parser.py dist/
+            cp Forensicsim_Parser.py dist/
             cd dist
             tar.exe -a -cf forensicsim.zip Forensicsim_Parser.py ms_teams_parser.exe
     - name: Upload artifacts to GitHub Release
