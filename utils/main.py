@@ -164,17 +164,6 @@ class Contact(DataClassJsonMixin):
         return self.mri < other.mri
 
 
-LUT_KEYS_MSTEAMS_2_0 = {
-    "messageMap": "messages",
-    "id": "createdTime",
-    "isSentByCurrentUser": "isFromMe",
-    "originalArrivalTime": "originalarrivaltime",
-    "clientMessageId": "clientmessageid",
-    "contentType": "contenttype",
-    "messageType": "messagetype",
-}
-
-
 def _parse_people(people: list[dict]) -> set[Contact]:
     parsed_people = set()
     for p in people:
@@ -214,12 +203,7 @@ def _parse_reply_chains(reply_chains: list[dict]) -> set[Message]:
     cleaned_reply_chains = set()
 
     for rc in reply_chains:
-        # Reassign new keys to old identifiers
-        rc_values = rc.get("value", {})
-        keys = [LUT_KEYS_MSTEAMS_2_0.get(k, k) for k in rc_values]
-        rc_values.update(zip(keys, rc_values.values()))
-
-        for message_values in rc_values.get("messages", {}).values():
+        for message_values in rc.get("value", {}).get("messages", {}).values():
             message_values |= {
                 "origin_file": rc.get("origin_file"),
             }
