@@ -20,8 +20,9 @@ jobs:
         run:  pyinstaller "main.spec"
       - name: Run conversion ↩️
         run: |
-             .\dist\ms_teams_parser.exe -f ".\forensicsim-data\jane_doe_old_teams\IndexedDB\https_teams.microsoft.com_0.indexeddb.leveldb" -o "jane_doe.json"
-             .\dist\ms_teams_parser.exe -f ".\forensicsim-data\john_doe_old_teams\IndexedDB\https_teams.microsoft.com_0.indexeddb.leveldb" -o "john_doe.json"
+             .\dist\ms_teams_parser.exe -f ".\forensicsim-data\jane_doe_old_teams\IndexedDB\https_teams.microsoft.com_0.indexeddb.leveldb" -o "jane_doe_old_teams.json"
+             .\dist\ms_teams_parser.exe -f ".\forensicsim-data\john_doe_old_teams\IndexedDB\https_teams.microsoft.com_0.indexeddb.leveldb" -o "john_doe_old_teams.json"
+             .\dist\ms_teams_parser.exe -f ".\forensicsim-data\mboufahja_new_teams\IndexedDB\https_teams.microsoft.com_0.indexeddb.leveldb" -o "mboufahja_new_teams.json"
       - name: Test calling script 📞
         run: |
               python utils/dump_leveldb.py --help
