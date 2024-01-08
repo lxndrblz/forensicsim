@@ -24,55 +24,38 @@ SOFTWARE.
 
 from pathlib import Path
 
-import argparse
-import pyfiglet
-import pyfiglet.fonts
+import click
 
-import shared
-
-
-def process_db(filepath, output_path):
-    # Do some basic error handling
-
-    p = Path(filepath)
-    if not p.exists():
-        raise Exception("Given file path does not exists. Path: {}".format(filepath))
-
-    if not p.is_dir():
-        raise Exception("Given file path is not a folder. Path: {}".format(filepath))
-
-    # convert the database to a python list with nested dictionaries
-    #
-    extracted_values = shared.parse_sessionstorage(p)
-
-    # write the output to a json file
-    shared.write_results_to_json(extracted_values, output_path)
+from consts import DUMP_HEADER
+from shared import parse_sessionstorage, write_results_to_json
 
 
-def run(args):
-    process_db(args.filepath, args.outputpath)
+def process_db(input_path: Path, output_path: Path):
+    extracted_values = parse_sessionstorage(input_path)
+    write_results_to_json(extracted_values, output_path)
 
 
-def parse_cmdline():
-    description = "Forensics.im Dump Session Storage"
-    parser = argparse.ArgumentParser(description=description)
-    required_group = parser.add_argument_group("required arguments")
-    required_group.add_argument(
-        "-f", "--filepath", required=True, help="File path to the IndexedDB."
-    )
-    required_group.add_argument(
-        "-o", "--outputpath", required=True, help="File path to the processed output."
-    )
-    args = parser.parse_args()
-    return args
-
-
-def cli():
-    header = pyfiglet.figlet_format("Forensics.im Dump Tool")
-    print(header)
-    args = parse_cmdline()
-    run(args)
+@click.command()
+@click.option(
+    "-f",
+    "--filepath",
+    type=click.Path(
+        exists=True, readable=True, writable=False, dir_okay=True, path_type=Path
+    ),
+    required=True,
+    help="File path to the IndexedDB.",
+)
+@click.option(
+    "-o",
+    "--outputpath",
+    type=click.Path(writable=True, path_type=Path),
+    required=True,
+    help="File path to the processed output.",
+)
+def process_cmd(filepath, outputpath):
+    click.echo(DUMP_HEADER)
+    process_db(filepath, outputpath)
 
 
 if __name__ == "__main__":
-    cli()
+    process_cmd()

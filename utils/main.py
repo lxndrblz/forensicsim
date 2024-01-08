@@ -22,17 +22,15 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-import argparse
 import json
 from datetime import datetime
 from pathlib import Path
 
-import pyfiglet
-import pyfiglet.fonts
+import click
 from bs4 import BeautifulSoup
 
-import shared
-import sys
+from shared import parse_db, write_results_to_json
+from consts import XTRACT_HEADER
 
 MESSAGE_TYPES = {
     "messages": {
@@ -340,54 +338,36 @@ def deduplicate(records, key):
     return distinct_records
 
 
-def process_db(filepath, output_path):
-    # Do some basic error handling
-    if not filepath.endswith("leveldb"):
-        raise Exception("Expected a leveldb folder. Path: {}".format(filepath))
+def process_db(input_path: Path, output_path: Path):
+    if not input_path.parts[-1].endswith(".leveldb"):
+        raise ValueError(f"Expected a leveldb folder. Path: {input_path}")
 
-    p = Path(filepath)
-    if not p.exists():
-        raise Exception("Given file path does not exists. Path: {}".format(filepath))
-
-    if not p.is_dir():
-        raise Exception("Given file path is not a folder. Path: {}".format(filepath))
-
-    # convert the database to a python list with nested dictionaries
-
-    extracted_values = shared.parse_db(filepath)
-
-    # parse records
+    extracted_values = parse_db(input_path)
     parsed_records = parse_records(extracted_values)
-
-    # write the output to a json file
-    shared.write_results_to_json(parsed_records, output_path)
+    write_results_to_json(parsed_records, output_path)
 
 
-def run(args):
-    process_db(args.filepath, args.outputpath)
-
-
-def parse_cmdline():
-    description = "Forensics.im Xtract Tool"
-    parser = argparse.ArgumentParser(description=description)
-    required_group = parser.add_argument_group("required arguments")
-    required_group.add_argument(
-        "-f", "--filepath", required=True, help="File path to the IndexedDB."
-    )
-    required_group.add_argument(
-        "-o", "--outputpath", required=True, help="File path to the processed output."
-    )
-    args = parser.parse_args()
-    return args
-
-
-def cli():
-    header = pyfiglet.figlet_format("Forensics.im Xtract Tool")
-    print(header)
-    args = parse_cmdline()
-    run(args)
-    sys.exit(0)
+@click.command()
+@click.option(
+    "-f",
+    "--filepath",
+    type=click.Path(
+        exists=True, readable=True, writable=False, dir_okay=True, path_type=Path
+    ),
+    required=True,
+    help="File path to the IndexedDB.",
+)
+@click.option(
+    "-o",
+    "--outputpath",
+    type=click.Path(writable=True, path_type=Path),
+    required=True,
+    help="File path to the processed output.",
+)
+def process_cmd(filepath, outputpath):
+    click.echo(XTRACT_HEADER)
+    process_db(filepath, outputpath)
 
 
 if __name__ == "__main__":
-    cli()
+    process_cmd()
