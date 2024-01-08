@@ -1,15 +1,15 @@
-from datetime import datetime
 import json
-from pathlib import Path
 import sys
+from dataclasses import dataclass, field
+from datetime import datetime
+from pathlib import Path
 from typing import Any, Optional
 
-from bs4 import BeautifulSoup
 import click
-from dataclasses import dataclass, field
-from dataclasses_json import config, LetterCase, dataclass_json, Undefined
-from shared import parse_db, write_results_to_json
+from bs4 import BeautifulSoup
 from consts import XTRACT_HEADER
+from dataclasses_json import LetterCase, Undefined, config, dataclass_json
+from shared import parse_db, write_results_to_json
 
 
 @dataclass_json(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)
@@ -31,7 +31,7 @@ class Meeting:
         return self.cached_deduplication_key == other.cachedDeduplicationKey
 
     def __hash__(self):
-        return hash((self.cached_deduplication_key))
+        return hash(self.cached_deduplication_key)
 
     def __lt__(self, other):
         return self.cached_deduplication_key < other.cached_deduplication_key
@@ -75,7 +75,7 @@ class Message:
         )
 
     def __hash__(self):
-        return hash((self.cached_deduplication_key))
+        return hash(self.cached_deduplication_key)
 
     def __lt__(self, other):
         return self.cached_deduplication_key < other.cached_deduplication_key
@@ -100,7 +100,7 @@ class Contact:
         return self.mri == other.mri
 
     def __hash__(self):
-        return hash((self.mri))
+        return hash(self.mri)
 
     def __lt__(self, other):
         return self.mri < other.mri
@@ -186,7 +186,7 @@ def _parse_reply_chains(reply_chains: list[dict]) -> set[Message]:
     for rc in reply_chains:
         # Reassign new keys to old identifiers
         kwargs = rc.get("value", {})
-        keys = [LUT_KEYS_MSTEAMS_2_0.get(k, k) for k in kwargs.keys()]
+        keys = [LUT_KEYS_MSTEAMS_2_0.get(k, k) for k in kwargs]
         kwargs.update(zip(keys, kwargs.values()))
 
         for message_values in kwargs.get("messages", {}).values():

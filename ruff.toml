@@ -1,0 +1,42 @@
+# Same as Black.
+line-length = 88
+indent-width = 4
+
+# Assume Python 3.9
+target-version = "py39"
+
+# See rules: https://beta.rs/docs/rules/
+select = [
+    "C",    # flake8-comprehensions
+    "F",    # pyflakes
+    "FURB", # refurb
+    "I",    # isort
+    "N",    # pep8-naming
+    "PIE",  # misc lints
+    "PTH",  # flake8-use-pathlib
+    "PGH",  # pygrep
+    "RET",  # return
+    "RUF",  # ruff-specific rules
+    "UP",   # pyupgrade
+    "SIM",  # flake8-simplify
+    "W",    # pycodestyle warnings
+]
+
+# disable for now to keep current PR small
+exclude = ["utils/ccl_chrome_indexeddb/*.py", "utils/dump_*.py", "utils/populate_*.py","utils/const.py", "utils/shared.py", "utils/scout_leveldb.py", "Forensicsim_Parser.py"]
+
+
+ignore = [
+    "E501",  # line too long, handled by black
+    "N803",  # argument name should be lowercase
+    "N806",  # variable name should be lowercase
+    "C901",  # too complex
+    "D206",  # indent with white space
+    "W191",  # tab identation
+]
+
+[lint]
+preview = true
+
+[format]
+preview = true
