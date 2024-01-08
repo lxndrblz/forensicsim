@@ -22,8 +22,8 @@ jobs:
       run: |
            .\dist\ms_teams_parser.exe -f ".\forensicsim-data\jane_doe_v_1_4_00_11161\IndexedDB\https_teams.microsoft.com_0.indexeddb.leveldb" -o "jane_doe.json"
            .\dist\ms_teams_parser.exe -f ".\forensicsim-data\john_doe_v_1_4_00_11161\IndexedDB\https_teams.microsoft.com_0.indexeddb.leveldb" -o "john_doe.json"
-           .\dist\ms_teams_parser.exe -f ".\forensicsim-data\karelze_v_23306_3309_2530_1346\IndexedDB\https_teams.microsoft.com_0.indexeddb.leveldb" -o "john_doe.json"
-           .\dist\ms_teams_parser.exe -f ".\forensicsim-data\mboufahja_v_23231_413_2355_7555\IndexedDB\https_teams.microsoft.com_0.indexeddb.leveldb" -o "john_doe.json"
+           .\dist\ms_teams_parser.exe -f ".\forensicsim-data\karelze_v_23306_3309_2530_1346\IndexedDB\https_teams.live.com_0.indexeddb.leveldb" -o "karelze.json"
+           .\dist\ms_teams_parser.exe -f ".\forensicsim-data\mboufahja_v_23231_413_2355_7555\IndexedDB\https_teams.microsoft.com_0.indexeddb.leveldb" -o "mboufahja.json"
       continue-on-error: false
     - name: Test calling script 📞
       run: |
