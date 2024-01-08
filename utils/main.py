@@ -129,10 +129,7 @@ class Message(DataClassJsonMixin):
             self.record_type = "reaction"
 
     def __eq__(self, other):
-        return (
-            self.creator == other.creator
-            and self.clientmessageid == other.clientmessageid
-        )
+        return self.cached_deduplication_key == other.cached_deduplication_key
 
     def __hash__(self):
         return hash(self.cached_deduplication_key)
