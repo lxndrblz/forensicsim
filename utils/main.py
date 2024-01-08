@@ -16,20 +16,53 @@ from dataclasses_json import (
 )
 from shared import parse_db, write_results_to_json
 
-CAMEL_CASE_CONFIG = config(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)[
+
+def strip_html_tags(value):
+    # Get the text of any embedded html, such as divs, a href links
+    soup = BeautifulSoup(value, features="html.parser")
+    return soup.get_text()
+
+
+def decode_dict(properties):
+    if isinstance(properties, bytes):
+        soup = BeautifulSoup(properties, features="html.parser")
+        properties = properties.decode(soup.original_encoding)
+    if isinstance(properties, dict):
+        # handle case where nested childs are dicts or list but provided with "" but have to be expanded.
+        for key, value in properties.items():
+            if isinstance(value, str) and value.startswith(("[", "{")):
+                properties[key] = json.loads(value, strict=False)
+        return properties
+
+    return json.loads(properties, strict=False)
+
+
+def decode_timestamp(content_utf8_encoded) -> datetime:
+    return datetime.utcfromtimestamp(int(content_utf8_encoded) / 1000)
+
+
+def encode_timestamp(timestamp) -> Optional[str]:
+    if timestamp is not None:
+        return timestamp.strftime("%Y-%m-%dT%H:%M:%S.%f")
+    return None
+
+
+JSON_CONFIG = config(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)[
     "dataclasses_json"
 ]
 
 
 @dataclass()
 class Meeting(DataClassJsonMixin):
-    dataclass_json_config = CAMEL_CASE_CONFIG
+    dataclass_json_config = JSON_CONFIG
 
     client_update_time: Optional[str] = None
     cached_deduplication_key: Optional[str] = None
     id: Optional[str] = None
     members: Optional[list[dict]] = None
-    thread_properties: dict[str, Any] = field(default_factory=dict)
+    thread_properties: dict[str, Any] = field(
+        default_factory=dict, metadata=config(decoder=decode_dict)
+    )
     type: Optional[str] = None
     version: Optional[float] = None
 
@@ -49,7 +82,7 @@ class Meeting(DataClassJsonMixin):
 
 @dataclass()
 class Message(DataClassJsonMixin):
-    dataclass_json_config = CAMEL_CASE_CONFIG
+    dataclass_json_config = JSON_CONFIG
 
     attachments: list[Any] = field(default_factory=list)
     cached_deduplication_key: Optional[str] = None
@@ -57,16 +90,26 @@ class Message(DataClassJsonMixin):
     clientmessageid: Optional[str] = None
     composetime: Optional[str] = None
     conversation_id: Optional[str] = None
-    content: Optional[str] = None
+    content: Optional[str] = field(
+        default=None, metadata=config(decoder=strip_html_tags)
+    )
     contenttype: Optional[str] = None
-    created_time: Optional[str] = None
+    created_time: Optional[datetime] = field(
+        default=None,
+        metadata=config(decoder=decode_timestamp, encoder=encode_timestamp),
+    )
     creator: Optional[str] = None
     is_from_me: Optional[bool] = None
     message_kind: Optional[str] = None
     messagetype: Optional[str] = None
     originalarrivaltime: Optional[str] = None
-    properties: dict[str, Any] = field(default_factory=dict)
-    version: Optional[str] = None
+    properties: dict[str, Any] = field(
+        default_factory=dict, metadata=config(decoder=decode_dict)
+    )
+    version: Optional[datetime] = field(
+        default=None,
+        metadata=config(decoder=decode_timestamp, encoder=encode_timestamp),
+    )
 
     origin_file: Optional[str] = field(
         default=None, metadata=config(field_name="origin_file")
@@ -80,6 +123,10 @@ class Message(DataClassJsonMixin):
             self.cached_deduplication_key = str(self.creator) + str(
                 self.clientmessageid
             )
+        if "call-log" in self.properties:
+            self.record_type = "call"
+        if "activity" in self.properties:
+            self.record_type = "reaction"
 
     def __eq__(self, other):
         return (
@@ -96,7 +143,7 @@ class Message(DataClassJsonMixin):
 
 @dataclass()
 class Contact(DataClassJsonMixin):
-    dataclass_json_config = CAMEL_CASE_CONFIG
+    dataclass_json_config = JSON_CONFIG
 
     display_name: Optional[str] = None
     email: Optional[str] = None
@@ -131,35 +178,11 @@ LUT_KEYS_MSTEAMS_2_0 = {
 }
 
 
-def strip_html_tags(value):
-    # Get the text of any embedded html, such as divs, a href links
-    soup = BeautifulSoup(value, features="html.parser")
-    return soup.get_text()
-
-
-def decode_timestamp(content_utf8_encoded):
-    # timestamp appear in epoch format with milliseconds alias currentmillis
-    # Convert data to neat timestamp
-    converted_time_datetime = datetime.utcfromtimestamp(
-        int(content_utf8_encoded) / 1000
-    )
-    converted_time_string = converted_time_datetime.strftime("%Y-%m-%dT%H:%M:%S.%f")
-
-    return str(converted_time_string)
-
-
-def decode_dict(properties):
-    if isinstance(properties, bytes):
-        soup = BeautifulSoup(properties, features="html.parser")
-        properties = properties.decode(soup.original_encoding)
-    return json.loads(properties, strict=False)
-
-
 def _parse_people(people: list[dict]) -> set[Contact]:
     parsed_people = set()
     for p in people:
-        kwargs = p.get("value", {}) | {"origin_file": p.get("origin_file")}
-        parsed_people.add(Contact.from_dict(kwargs))
+        p |= {"origin_file": p.get("origin_file")}
+        parsed_people.add(Contact.from_dict(p))
     return parsed_people
 
 
@@ -168,8 +191,8 @@ def _parse_buddies(buddies: list[dict]) -> set[Contact]:
     for b in buddies:
         buddies_of_b = b.get("value", {}).get("buddies", [])
         for b_of_b in buddies_of_b:
-            kwargs = {"origin_file": b.get("origin_file")} | b_of_b
-            parsed_buddies.add(Contact.from_dict(kwargs))
+            b_of_b |= {"origin_file": b.get("origin_file")}
+            parsed_buddies.add(Contact.from_dict(b_of_b))
     return parsed_buddies
 
 
@@ -178,18 +201,14 @@ def _parse_conversations(conversations: list[dict]) -> set[Meeting]:
     for c in conversations:
         last_message = c.get("value", {}).get("lastMessage", {})
 
-        kwargs = c.get("value", {}) | {
+        c |= {
             "cachedDeduplicationKey": last_message.get("cachedDeduplicationKey"),
-            "origin_file": c.get("origin_file"),
-            "threadProperties": c.get("threadProperties"),
-            "type": c.get("type"),
         }
 
-        if kwargs["type"] == "Meeting" and "meeting" in kwargs["threadProperties"]:
-            kwargs["threadProperties"]["meeting"] = decode_dict(
-                kwargs["threadProperties"]["meeting"]
-            )
-            cleaned_conversations.add(Meeting.from_dict(kwargs))
+        if c.get("type", "") == "Meeting" and "meeting" in c.get(
+            "threadProperties", {}
+        ):
+            cleaned_conversations.add(Meeting.from_dict(c))
 
     return cleaned_conversations
 
@@ -199,40 +218,15 @@ def _parse_reply_chains(reply_chains: list[dict]) -> set[Message]:
 
     for rc in reply_chains:
         # Reassign new keys to old identifiers
-        kwargs = rc.get("value", {})
-        keys = [LUT_KEYS_MSTEAMS_2_0.get(k, k) for k in kwargs]
-        kwargs.update(zip(keys, kwargs.values()))
+        rc_values = rc.get("value", {})
+        keys = [LUT_KEYS_MSTEAMS_2_0.get(k, k) for k in rc_values]
+        rc_values.update(zip(keys, rc_values.values()))
 
-        for message_values in kwargs.get("messages", {}).values():
-            message_properties = message_values.get("properties", {})
-            # TODO: Required to check fo "RichText/Html" "Text"?
-
-            # general
-            if "links" in message_values:
-                message_values["links"] = decode_dict(message_values["links"])
-            if "files" in message_values:
-                message_values["files"] = decode_dict(message_values["files"])
-            if "content" in message_values:
-                message_values["content"] = strip_html_tags(message_values["content"])
-
-            # specific
-            if "call-log" in message_properties:
-                message_values["record_type"] = "call"
-                message_properties["call-log"] = decode_dict(
-                    message_properties["call-log"]
-                )
-            if "activity" in message_properties:
-                # TODO: required to check for "reactionInChat" or "reaction"?
-                message_values["record_type"] = "reaction"
-
-            # TODO: Move into dataclass?
-            message_kwargs = message_values | {
-                "created_time": decode_timestamp(message_values["createdTime"]),
-                "version": decode_timestamp(message_values["version"]),
+        for message_values in rc_values.get("messages", {}).values():
+            message_values |= {
                 "origin_file": rc.get("origin_file"),
             }
-
-            cleaned_reply_chains.add(Message.from_dict(message_kwargs))
+            cleaned_reply_chains.add(Message.from_dict(message_values))
     return cleaned_reply_chains
 
 
