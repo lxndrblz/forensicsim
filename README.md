@@ -102,19 +102,6 @@ pyinstaller "main.spec"
 
 # Utility Scripts for handling LevelDB databases:
 
-## Forensics.im LevelDB Scout
-This repository includes a script called `scout_leveldb.py`, which allows to search and browse a *LevelDB* in a very
-basic manner. This script can come in handy, if you are trying to see if a certain entry exists in the database or want
-to perform some manual data analysis. To open a database within the GUI, simply click on File -> Open LevelDB. Loading
-the database can take a seconds, so please be patient, as there is currently no progress bar implemented.
-
-![Autopsy Module](img/leveldb_scout.PNG)
-
-You can run the script like this:
-```
-python scout_leveldb.db
-```
-
 ## dump_leveldb.py
 This script allows dumping a *Microsoft Teams LevelDB* to a json file, without processing it further. The usage is
 as following. Simply specify the path to the database and where you want to output the JSON file.

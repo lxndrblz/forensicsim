@@ -26,7 +26,7 @@ import io
 import json
 import os
 
-from ccl_chrome_indexeddb import (
+from chromedb import (
     ccl_blink_value_deserializer,
     ccl_chromium_indexeddb,
     ccl_v8_value_deserializer,
@@ -34,7 +34,7 @@ from ccl_chrome_indexeddb import (
     ccl_chromium_localstorage,
     ccl_chromium_sessionstorage,
 )
-from ccl_chrome_indexeddb.ccl_chromium_indexeddb import (
+from chromedb.ccl_chromium_indexeddb import (
     DatabaseMetadataType,
     ObjectStoreMetadataType,
 )
@@ -122,7 +122,7 @@ class FastIndexedDB:
                         (
                             objstore_id,
                             varint_raw,
-                        ) = ccl_chromium_indexeddb.custom_le_varint_from_bytes(
+                        ) = ccl_chromium_indexeddb.le_varint_from_bytes(
                             record.key[len(prefix_objectstore) :]
                         )
                     except TypeError:
@@ -190,7 +190,7 @@ class FastIndexedDB:
                             (
                                 value_version,
                                 varint_raw,
-                            ) = ccl_chromium_indexeddb.custom_le_varint_from_bytes(
+                            ) = ccl_chromium_indexeddb.le_varint_from_bytes(
                                 record.value
                             )
                             val_idx = len(varint_raw)
@@ -203,7 +203,7 @@ class FastIndexedDB:
                             (
                                 blink_version,
                                 varint_raw,
-                            ) = ccl_chromium_indexeddb.custom_le_varint_from_bytes(
+                            ) = ccl_chromium_indexeddb.le_varint_from_bytes(
                                 record.value[val_idx:]
                             )
 
