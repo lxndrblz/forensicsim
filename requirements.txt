@@ -1,6 +1,9 @@
-chardet~=4.0.0
-dataclasses-json~=0.6.3
-pyfiglet~=0.8.post1
-colorama~=0.4.4
 beautifulsoup4~=4.9.3
+chardet~=4.0.0
 click~=8.0.1
+colorama~=0.4.4
+dataclasses-json~=0.6.3
+pause~=0.3
+pyautogui~=0.9.54
+pyfiglet~=0.8.post1
+pywinauto~=0.6.8

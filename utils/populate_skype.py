@@ -5,9 +5,11 @@ from calendar import timegm
 
 import click
 import pause
-import pyfiglet
+
 from pywinauto import Desktop, keyboard
 from pywinauto.application import Application
+
+from consts import UTIL_HEADER
 
 logging.basicConfig(
     format="%(asctime)s %(message)s",
@@ -142,8 +144,7 @@ def populate_data_skype(all_data_to_populate, account):
 )
 @click.option("--account", "-a", required=True, default="0", help="Account to populate")
 def cli(filepath, account):
-    header = pyfiglet.figlet_format("Forensics.im Util")
-    click.echo(header)
+    click.echo(UTIL_HEADER)
     with click.open_file(filepath, encoding="utf-8") as f:
         data = json.load(f)
         populate_data_skype(data, account)

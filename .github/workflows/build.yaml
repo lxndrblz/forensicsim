@@ -22,5 +22,13 @@ jobs:
         run: |
              .\dist\ms_teams_parser.exe -f ".\forensicsim-data\jane_doe_old_teams\IndexedDB\https_teams.microsoft.com_0.indexeddb.leveldb" -o "jane_doe.json"
              .\dist\ms_teams_parser.exe -f ".\forensicsim-data\john_doe_old_teams\IndexedDB\https_teams.microsoft.com_0.indexeddb.leveldb" -o "john_doe.json"
+      - name: Test calling script 📞
+        run: |
+              python utils/dump_leveldb.py --help
+              python utils/dump_localstorage.py --help
+              python utils/dump_sessionstorage.py --help
+#              python utils/populate_teams.py --help
+#              python utils/populate_teams_2.py --help
+#              python utils/populate_skype.py --help
       # - name: Calculate diff 👽
       #   run: git diff --no-index --word-diff expected_output/john_doe.json current_output.json
