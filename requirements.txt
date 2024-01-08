@@ -5,5 +5,4 @@ colorama~=0.4.4
 dataclasses-json~=0.6.3
 pause~=0.3
 pyautogui~=0.9.54
-pyfiglet~=0.8.post1
 pywinauto~=0.6.8
