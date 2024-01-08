@@ -17,12 +17,17 @@ jobs:
       run: |
             python -m pip install --upgrade pip
             python -m pip install -r requirements.txt pyinstaller
-    - name: Build binary
+    - name: Build binary 🚧
       run:  pyinstaller "main.spec"
+    - name: Zip files 🗜️
+      run: |
+            cp utils/Forensicsim_Parser.py dist/
+            cd dist
+            tar.exe -a -cf forensicsim.zip Forensicsim_Parser.py ms_teams_parser.exe
     - name: Upload artifacts to GitHub Release
       env:
             GITHUB_TOKEN: ${{ github.token }}
       run: >-
         gh release upload
-        '${{ github.ref_name }}' dist/ms_teams_parser.exe
+        '${{ github.ref_name }}' dist/forensicsim.zip
         --repo '${{ github.repository }}'
