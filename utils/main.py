@@ -7,8 +7,7 @@ from typing import Any, Optional
 from bs4 import BeautifulSoup
 import click
 from dataclasses import dataclass, field
-from dataclasses_json import LetterCase, dataclass_json, Undefined
-
+from dataclasses_json import config, LetterCase, dataclass_json, Undefined
 from shared import parse_db, write_results_to_json
 from consts import XTRACT_HEADER
 
@@ -24,13 +23,15 @@ class Meeting:
     type: Optional[str] = None
     version: Optional[float] = None
 
-    record_type: Optional[str] = "meeting"
+    record_type: Optional[str] = field(
+        default="meeting", metadata=config(field_name="record_type")
+    )
 
     def __eq__(self, other):
         return self.cached_deduplication_key == other.cachedDeduplicationKey
 
     def __hash__(self):
-        return hash(("cachedDeduplicationKey", self.cached_deduplication_key))
+        return hash((self.cached_deduplication_key))
 
     def __lt__(self, other):
         return self.cached_deduplication_key < other.cached_deduplication_key
@@ -56,8 +57,12 @@ class Message:
     properties: dict[str, Any] = field(default_factory=dict)
     version: Optional[str] = None
 
-    origin_file: Optional[str] = None
-    record_type: Optional[str] = "message"
+    origin_file: Optional[str] = field(
+        default=None, metadata=config(field_name="origin_file")
+    )
+    record_type: str = field(
+        default="message", metadata=config(field_name="record_type")
+    )
 
     def __post_init__(self):
         if self.cached_deduplication_key is None:
@@ -70,7 +75,7 @@ class Message:
         )
 
     def __hash__(self):
-        return hash(("cachedDeduplicationKey", self.cached_deduplication_key))
+        return hash((self.cached_deduplication_key))
 
     def __lt__(self, other):
         return self.cached_deduplication_key < other.cached_deduplication_key
@@ -81,17 +86,21 @@ class Message:
 class Contact:
     display_name: Optional[str] = None
     email: Optional[str] = None
-    mri: Optional[str] = None
+    mri: Optional[str] = field(default=None, compare=True)
     user_principal_name: Optional[str] = None
 
-    origin_file: Optional[str] = None
-    record_type: str = "contact"
+    origin_file: Optional[str] = field(
+        default=None, metadata=config(field_name="origin_file")
+    )
+    record_type: Optional[str] = field(
+        default="contact", metadata=config(field_name="record_type")
+    )
 
     def __eq__(self, other):
         return self.mri == other.mri
 
     def __hash__(self):
-        return hash(("mri", self.mri))
+        return hash((self.mri))
 
     def __lt__(self, other):
         return self.mri < other.mri
