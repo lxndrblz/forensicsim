@@ -8,13 +8,23 @@ from typing import Any, Optional
 import click
 from bs4 import BeautifulSoup
 from consts import XTRACT_HEADER
-from dataclasses_json import LetterCase, Undefined, config, dataclass_json
+from dataclasses_json import (
+    DataClassJsonMixin,
+    LetterCase,
+    Undefined,
+    config,
+)
 from shared import parse_db, write_results_to_json
 
+CAMEL_CASE_CONFIG = config(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)[
+    "dataclasses_json"
+]
 
-@dataclass_json(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)
+
 @dataclass()
-class Meeting:
+class Meeting(DataClassJsonMixin):
+    dataclass_json_config = CAMEL_CASE_CONFIG
+
     client_update_time: Optional[str] = None
     cached_deduplication_key: Optional[str] = None
     id: Optional[str] = None
@@ -37,9 +47,10 @@ class Meeting:
         return self.cached_deduplication_key < other.cached_deduplication_key
 
 
-@dataclass_json(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)
 @dataclass()
-class Message:
+class Message(DataClassJsonMixin):
+    dataclass_json_config = CAMEL_CASE_CONFIG
+
     attachments: list[Any] = field(default_factory=list)
     cached_deduplication_key: Optional[str] = None
     client_arrival_time: Optional[str] = None
@@ -66,7 +77,9 @@ class Message:
 
     def __post_init__(self):
         if self.cached_deduplication_key is None:
-            self.cached_deduplication_key = self.creator + self.clientmessageid
+            self.cached_deduplication_key = str(self.creator) + str(
+                self.clientmessageid
+            )
 
     def __eq__(self, other):
         return (
@@ -81,9 +94,10 @@ class Message:
         return self.cached_deduplication_key < other.cached_deduplication_key
 
 
-@dataclass_json(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)
 @dataclass()
-class Contact:
+class Contact(DataClassJsonMixin):
+    dataclass_json_config = CAMEL_CASE_CONFIG
+
     display_name: Optional[str] = None
     email: Optional[str] = None
     mri: Optional[str] = field(default=None, compare=True)
