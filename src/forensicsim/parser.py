@@ -166,7 +166,7 @@ def _parse_people(people: list[dict]) -> set[Contact]:
     parsed_people = set()
     for p in people:
         p |= {"origin_file": p.get("origin_file")}
-        p |= p.get("value") 
+        p |= p.get("value")
         parsed_people.add(Contact.from_dict(p))
     return parsed_people
 
