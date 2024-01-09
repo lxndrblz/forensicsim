@@ -1,20 +1,18 @@
 import json
-import sys
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
-import click
 from bs4 import BeautifulSoup
-from consts import XTRACT_HEADER
 from dataclasses_json import (
     DataClassJsonMixin,
     LetterCase,
     Undefined,
     config,
 )
-from shared import parse_db, write_results_to_json
+
+from forensicsim.backend import parse_db, write_results_to_json
 
 
 def strip_html_tags(value):
@@ -242,30 +240,3 @@ def process_db(input_path: Path, output_path: Path):
     extracted_values = parse_db(input_path)
     parsed_records = parse_records(extracted_values)
     write_results_to_json(parsed_records, output_path)
-
-
-@click.command()
-@click.option(
-    "-f",
-    "--filepath",
-    type=click.Path(
-        exists=True, readable=True, writable=False, dir_okay=True, path_type=Path
-    ),
-    required=True,
-    help="File path to the IndexedDB.",
-)
-@click.option(
-    "-o",
-    "--outputpath",
-    type=click.Path(writable=True, path_type=Path),
-    required=True,
-    help="File path to the processed output.",
-)
-def process_cmd(filepath, outputpath):
-    click.echo(XTRACT_HEADER)
-    process_db(filepath, outputpath)
-    sys.exit(0)
-
-
-if __name__ == "__main__":
-    process_cmd()

@@ -33,7 +33,7 @@ If you are curious about the artefacts that are generate by Microsoft Teams, I w
 This module requires the installation of Autopsy v4.18 or above and a *Windows*-based system.
 
 To install the *Microsoft Teams* parser for *Autopsy*, please follow these steps:
-* Download the `.zip` folder and the `.exe` file of the latest available [release](https://github.com/lxndrblz/forensicsim/releases).
+* Download the `forensicsim.zip` folder of the latest available [release](https://github.com/lxndrblz/forensicsim/releases).
 * Extract the `.zip` folder onto your computer.
 * Open the Windows File Explorer and navigate to your *Autopsy* Python plugin directory. By default, it is located under `%AppData%\autopsy\python_modules`.
 * Create a new `forensicsim` folder within the `python_modules` folder.
@@ -102,19 +102,6 @@ pyinstaller "main.spec"
 
 # Utility Scripts for handling LevelDB databases:
 
-## Forensics.im LevelDB Scout
-This repository includes a script called `scout_leveldb.py`, which allows to search and browse a *LevelDB* in a very
-basic manner. This script can come in handy, if you are trying to see if a certain entry exists in the database or want
-to perform some manual data analysis. To open a database within the GUI, simply click on File -> Open LevelDB. Loading
-the database can take a seconds, so please be patient, as there is currently no progress bar implemented.
-
-![Autopsy Module](img/leveldb_scout.PNG)
-
-You can run the script like this:
-```
-python scout_leveldb.db
-```
-
 ## dump_leveldb.py
 This script allows dumping a *Microsoft Teams LevelDB* to a json file, without processing it further. The usage is
 as following. Simply specify the path to the database and where you want to output the JSON file.
@@ -134,7 +121,6 @@ as following. Simply specify the path to the database and where you want to outp
 
 usage: dump_leveldb.py [-h] -f FILEPATH -o OUTPUTPATH
 dump_leveldb.py: error: the following arguments are required: -f/--filepath, -o/--outputpath
-
 ```
 ---
 
@@ -144,16 +130,16 @@ dump_leveldb.py: error: the following arguments are required: -f/--filepath, -o/
 
 A wee script for populating *Skype for Desktop* in a lab environment. The script can be used like this:
 
-```
-utils\populate_skype.py -a 0 -f conversation.json
+```bash
+tools\populate_skype.py -a 0 -f conversation.json
 ```
 
 ## populate_teams.py
 
 A wee script for populating *Microsoft Teams* in a lab environment. The script can be used like this:
 
-```
-utils\populate_teams.py -a 0 -f conversation.json
+```bash
+tools\populate_teams.py -a 0 -f conversation.json
 ```
 
 ---
@@ -161,7 +147,6 @@ utils\populate_teams.py -a 0 -f conversation.json
 This repository comes with two datasets that allow reproducing the findings of this work. The `testdata` folder contains the *LevelDB* databases that have been extracted from two test clients. These can be used for benchmarking without having to perform a (lengthy) data population.
 
 The `populationdata` contains *JSON* files of the communication that has been populated into the testing environment. These can be used to reproduce the experiment from scratch. However, for a rerun, it will be essential to adjust the dates to future dates, as the populator script relies on sufficient breaks between the individual messages.
-
 ---
 
 # Acknowledgements & Thanks

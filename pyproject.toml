@@ -1,0 +1,116 @@
+[build-system]
+requires = ["setuptools >= 61.0"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name = "forensicsim"
+description = "A forensic open-source parser module for Autopsy that allows extracting the messages, comments, posts, contacts, calendar entries and reactions from a Microsoft Teams IndexedDB LevelDB database."
+readme = "README.md"
+license = {file = "LICENSE.md"}
+requires-python = ">=3.9"
+authors = [
+    { name = "Alexander Bilz", email = "github@markusbilz.com" },
+    { name = "Markus Bilz", email = "github@markusbilz.com" }
+]
+dependencies = [
+"beautifulsoup4~=4.9.3",
+"click~=8.0.1",
+"chromedb @ git+https://github.com/karelze/ccl_chrome_indexeddb@master",
+"dataclasses-json~=0.6.3",
+"pause~=0.3",
+"pyautogui~=0.9.54",
+"pywinauto~=0.6.8"
+]
+
+dynamic = ["version"]
+
+[tool.setuptools.dynamic]
+version = {attr = "forensicsim.__version__"}
+
+[project.urls]
+"Homepage" = "https://forensics.im/"
+"Bug Tracker" = "https://github.com/lxndrblz/forensicsim/issues"
+
+[project.optional-dependencies]
+dev=[
+    "build",
+    "pre-commit",
+    "ruff",
+    "tox",
+]
+
+
+[tool.ruff]
+
+target-version = "py39"
+
+# See rules: https://beta.ruff.rs/docs/rules/
+select = [
+    "C",    # flake8-comprehensions
+    "F",    # pyflakes
+    "FURB", # refurb
+    "I",    # isort
+    "PGH",  # pygrep
+    "PIE",  # misc lints
+#    "PTH",  # flake8-use-pathlib
+    "RET",  # return
+    "RUF",  # ruff-specific rules
+    "SIM",  # flake8-simplify
+    "UP",   # pyupgrade
+]
+
+include = ["*.py", "*.pyi", "**/pyproject.toml"]
+
+ignore = [
+    "C901",  # too complex
+    "E501",  # line too long, handled by black
+    "D206",  # indent with white space
+    "W191",  # tab identation
+]
+
+[tool.ruff.lint]
+preview = true
+# exclude = ["tools/**.py"]
+
+[tool.ruff.format]
+preview = true
+
+[tool.ruff.isort]
+known-first-party = ["forensicsim"]
+section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
+
+[tool.tox]
+legacy_tox_ini = """
+
+[tox]
+envlist = format, lint, pre-commit
+skipdist = True
+isolated_build = True
+
+[testenv]
+deps = .[dev]
+
+# Cleanup tasks
+[testenv:clean]
+commands =
+    sh -c "rm -rf build cover dist .hypothesis .mypy_cache .pytest_cache site"
+
+# Auto Formatting
+[testenv:format]
+commands =
+    python -m ruff src tests --fix
+    python -m ruff format src
+
+# Syntax Checks
+[testenv:lint]
+commands =
+    python -m ruff --output-format=github src
+    python -m ruff format src --check
+
+# Pre-Commit
+[testenv:pre-commit]
+commands =
+    python -m pre-commit run --all-files --show-diff-on-failure
+
+"""
