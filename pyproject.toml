@@ -19,7 +19,7 @@ dependencies = [
 "chromedb @ git+https://github.com/karelze/ccl_chrome_indexeddb@master",
 "pause~=0.3",
 "pyautogui~=0.9.54",
-"pywinauto~=0.6.8"
+# "pywinauto~=0.6.8"
 ]
 
 dynamic = ["version"]
@@ -34,8 +34,9 @@ version = {attr = "forensicsim.__version__"}
 [project.optional-dependencies]
 dev=[
     "build",
-    "ruff",
     "pre-commit",
+    "ruff",
+    "tox",
 ]
 
 
@@ -76,3 +77,38 @@ preview = true
 [tool.ruff.isort]
 known-first-party = ["forensicsim"]
 section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
+
+[tool.tox]
+legacy_tox_ini = """
+
+[tox]
+envlist = format, lint, pre-commit
+skipdist = True
+isolated_build = True
+
+[testenv]
+deps = .[dev]
+
+# Cleanup tasks
+[testenv:clean]
+commands =
+    sh -c "rm -rf build cover dist .hypothesis .mypy_cache .pytest_cache site"
+
+# Auto Formatting
+[testenv:format]
+commands =
+    python -m ruff src tests --fix
+    python -m ruff format src
+
+# Syntax Checks
+[testenv:lint]
+commands =
+    python -m ruff --output-format=github src
+    python -m ruff format src --check
+
+# Pre-Commit
+[testenv:pre-commit]
+commands =
+    python -m pre-commit run --all-files --show-diff-on-failure
+
+"""

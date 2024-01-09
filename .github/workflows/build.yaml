@@ -15,7 +15,9 @@ jobs:
       - name: Install dependencies
         run: |
               python -m pip install --upgrade pip
-              python -m pip install . pyinstaller
+              python -m pip install .[dev] pyinstaller
+      - name: Lint code 🦄
+        run: tox -e lint
       - name: Build binary 🔢
         run:  pyinstaller "main.spec"
       - name: Run conversion ↩️
