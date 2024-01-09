@@ -172,12 +172,14 @@ class FastIndexedDB:
                 print(f"WARNING: Skipping database {global_id.name}")
                 continue
 
+            max_object_stores = self.database_metadata.get_meta(
+                global_id.dbid_no, DatabaseMetadataType.MaximumObjectStoreId
+            )
+            max_object_stores = max_object_stores if not max_object_stores else 0
+
             for object_store_id in range(
                 1,
-                self.database_metadata.get_meta(
-                    global_id.dbid_no, DatabaseMetadataType.MaximumObjectStoreId
-                )
-                + 1,
+                max_object_stores + 1,
             ):
                 datastore = self.object_store_meta.get_meta(
                     global_id.dbid_no,
