@@ -1,4 +1,4 @@
-beautifulsoup4~=4.9.3
+beautifulsoup4~=4.12.2
 chardet~=4.0.0
 click~=8.1.7
 chromedb @ git+https://github.com/karelze/ccl_chrome_indexeddb@master
