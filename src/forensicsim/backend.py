@@ -24,7 +24,9 @@ SOFTWARE.
 
 import io
 import json
-import os
+from collections.abc import Iterator
+from pathlib import Path
+from typing import Any, Optional, Union
 
 from chromedb import (
     ccl_blink_value_deserializer,
@@ -35,7 +37,10 @@ from chromedb import (
     ccl_v8_value_deserializer,
 )
 from chromedb.ccl_chromium_indexeddb import (
+    DatabaseMetadata,
     DatabaseMetadataType,
+    GlobalMetadata,
+    ObjectStoreMetadata,
     ObjectStoreMetadataType,
 )
 
@@ -53,21 +58,21 @@ Additionally, it has a flag to filter for datastores, which are interesting for 
 
 
 class FastIndexedDB:
-    def __init__(self, leveldb_dir: os.PathLike):
+    def __init__(self, leveldb_dir: Path):
         self._db = ccl_leveldb.RawLevelDb(leveldb_dir)
-        self._fetched_records = []
-        self.global_metadata = None
-        self.database_metadata = None
-        self.object_store_meta = None
+        self._fetched_records: list[ccl_leveldb.Record] = []
+        self.global_metadata: GlobalMetadata
+        self.database_metadata: DatabaseMetadata
+        self.object_store_meta: ObjectStoreMetadata
         self.fetch_data()
 
-    def fetch_data(self):
-        global_metadata_raw = {}
+    def fetch_data(self) -> None:
+        global_metadata_raw: dict[bytes, ccl_leveldb.Records] = {}
+        database_metadata_raw: dict[tuple, Any] = {}
+        objectstore_metadata_raw: dict[tuple, Any] = {}
 
-        database_metadata_raw = {}
-        objectstore_metadata_raw = {}
+        self._fetched_records.clear()
 
-        self._fetched_records = []
         # Fetch the records only once
         for record in self._db.iterate_records_raw():
             self._fetched_records.append(record)
@@ -148,15 +153,21 @@ class FastIndexedDB:
             objectstore_metadata_raw
         )
 
-    def get_database_metadata(self, db_id: int, meta_type: DatabaseMetadataType):
-        return self.database_metadata.get_meta(db_id, meta_type)
+    def get_database_metadata(
+        self, db_id: int, meta_type: DatabaseMetadataType
+    ) -> Optional[Union[str, int]]:
+        if self.database_metadata:
+            return self.database_metadata.get_meta(db_id, meta_type)
+        return None
 
     def get_object_store_metadata(
         self, db_id: int, obj_store_id: int, meta_type: ObjectStoreMetadataType
-    ):
-        return self.object_store_meta.get_meta(db_id, obj_store_id, meta_type)
+    ) -> Optional[Any]:
+        if self.object_store_meta:
+            return self.object_store_meta.get_meta(db_id, obj_store_id, meta_type)
+        return None
 
-    def iterate_records(self, do_not_filter=False):
+    def __iter__(self) -> Iterator[dict[str, Any]]:
         blink_deserializer = ccl_blink_value_deserializer.BlinkV8Deserializer()
         # Loop through the databases and object stores based on their ids
         for global_id in self.global_metadata.db_ids:
@@ -179,12 +190,10 @@ class FastIndexedDB:
                 )
 
                 # print(f"\t Processing object store: {datastore}")
-                records_per_object_store = 0
-                if datastore in TEAMS_DB_OBJECT_STORES or do_not_filter:
+                if datastore in TEAMS_DB_OBJECT_STORES:
                     prefix = bytes([0, global_id.dbid_no, object_store_id, 1])
                     for record in self._fetched_records:
                         if record.key.startswith(prefix):
-                            records_per_object_store += 1
                             # Skip records with empty values as these cant properly decoded
                             if record.value == b"":
                                 continue
@@ -202,7 +211,7 @@ class FastIndexedDB:
                             val_idx += 1
 
                             (
-                                _blink_version,
+                                _,
                                 varint_raw,
                             ) = ccl_chromium_indexeddb.le_varint_from_bytes(
                                 record.value[val_idx:]
@@ -230,19 +239,14 @@ class FastIndexedDB:
                             except Exception:
                                 # TODO Some proper error handling wouldn't hurt
                                 continue
-                # print(f"{datastore} {global_id.name} {records_per_object_store}")
 
 
-def parse_db(filepath, do_not_filter=False):
-    # Open raw access to a LevelDB and deserialize the records.
+def parse_db(filepath: Path) -> list[dict]:
     db = FastIndexedDB(filepath)
-    extracted_values = []
-    for record in db.iterate_records(do_not_filter):
-        extracted_values.append(record)
-    return extracted_values
+    return list(db)
 
 
-def parse_localstorage(filepath):
+def parse_localstorage(filepath: Path) -> list[dict]:
     local_store = ccl_chromium_localstorage.LocalStoreDb(filepath)
     extracted_values = []
     for record in local_store.iter_all_records():
@@ -253,7 +257,7 @@ def parse_localstorage(filepath):
     return extracted_values
 
 
-def parse_sessionstorage(filepath):
+def parse_sessionstorage(filepath: Path) -> list[dict]:
     session_storage = ccl_chromium_sessionstorage.SessionStoreDb(filepath)
     extracted_values = []
     for host in session_storage:
@@ -274,22 +278,13 @@ def parse_sessionstorage(filepath):
     return extracted_values
 
 
-def write_results_to_json(data, outputpath):
-    # Dump messages into a json file
-    try:
-        with open(outputpath, "w", encoding="utf-8") as f:
-            json.dump(
-                data, f, indent=4, sort_keys=True, default=str, ensure_ascii=False
-            )
-    except OSError as e:
-        print(e)
+def write_results_to_json(data: object, outputpath: Path) -> None:
+    with outputpath.open("w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4, sort_keys=True, default=str, ensure_ascii=False)
 
 
-def parse_json():
+def parse_json() -> Any:
     # read data from a file. This is only for testing purpose.
-    try:
-        with open("teams.json") as json_file:
-            data = json.load(json_file)
-            return data
-    except OSError as e:
-        print(e)
+    with Path("teams.json").open() as json_file:
+        data = json.load(json_file)
+    return data
