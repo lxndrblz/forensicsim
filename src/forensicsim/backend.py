@@ -156,16 +156,12 @@ class FastIndexedDB:
     def get_database_metadata(
         self, db_id: int, meta_type: DatabaseMetadataType
     ) -> Optional[Union[str, int]]:
-        if self.database_metadata:
-            return self.database_metadata.get_meta(db_id, meta_type)
-        return None
+        return self.database_metadata.get_meta(db_id, meta_type)
 
     def get_object_store_metadata(
         self, db_id: int, obj_store_id: int, meta_type: ObjectStoreMetadataType
     ) -> Optional[Any]:
-        if self.object_store_meta:
-            return self.object_store_meta.get_meta(db_id, obj_store_id, meta_type)
-        return None
+        return self.object_store_meta.get_meta(db_id, obj_store_id, meta_type)
 
     def __iter__(self) -> Iterator[dict[str, Any]]:
         blink_deserializer = ccl_blink_value_deserializer.BlinkV8Deserializer()

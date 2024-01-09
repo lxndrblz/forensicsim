@@ -117,7 +117,7 @@ commands =
 # Syntax Checks
 [testenv:lint]
 commands =
-    python -m mypy src/backend.py
+    python -m mypy src/forensicsim/backend.py
     python -m ruff --output-format=github src
     python -m ruff format src --check
 
