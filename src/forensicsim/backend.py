@@ -122,7 +122,7 @@ class FastIndexedDB:
                         (
                             objstore_id,
                             varint_raw,
-                        ) = ccl_chromium_indexeddb.le_varint_from_bytes(
+                        ) = ccl_chromium_indexeddb.custom_le_varint_from_bytes(
                             record.key[len(prefix_objectstore) :]
                         )
                     except TypeError:
@@ -192,7 +192,7 @@ class FastIndexedDB:
                             (
                                 _value_version,
                                 varint_raw,
-                            ) = ccl_chromium_indexeddb.le_varint_from_bytes(
+                            ) = ccl_chromium_indexeddb.custom_le_varint_from_bytes(
                                 record.value
                             )
                             val_idx = len(varint_raw)
@@ -203,9 +203,9 @@ class FastIndexedDB:
                             val_idx += 1
 
                             (
-                                _blink_version,
+                                _,
                                 varint_raw,
-                            ) = ccl_chromium_indexeddb.le_varint_from_bytes(
+                            ) = ccl_chromium_indexeddb.custom_le_varint_from_bytes(
                                 record.value[val_idx:]
                             )
 
