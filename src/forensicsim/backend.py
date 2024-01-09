@@ -175,7 +175,7 @@ class FastIndexedDB:
             max_object_stores = self.database_metadata.get_meta(
                 global_id.dbid_no, DatabaseMetadataType.MaximumObjectStoreId
             )
-            max_object_stores = max_object_stores if not max_object_stores else 0
+            max_object_stores = max_object_stores if max_object_stores else 0
 
             for object_store_id in range(
                 1,
