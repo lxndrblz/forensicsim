@@ -19,7 +19,7 @@ dependencies = [
 "chromedb @ git+https://github.com/karelze/ccl_chrome_indexeddb@master",
 "pause~=0.3",
 "pyautogui~=0.9.54",
-# "pywinauto~=0.6.8"
+"pywinauto~=0.6.8"
 ]
 
 dynamic = ["version"]
