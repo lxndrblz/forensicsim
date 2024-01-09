@@ -24,9 +24,10 @@ jobs:
              .\dist\ms_teams_parser.exe -f ".\forensicsim-data\john_doe_v_1_4_00_11161\IndexedDB\https_teams.microsoft.com_0.indexeddb.leveldb" -o "john_doe.json"
       - name: Test calling script 📞
         run: |
-              python utils/dump_leveldb.py --help
-              python utils/dump_localstorage.py --help
-              python utils/dump_sessionstorage.py --help
+              python tools/main.py --help
+              python tools/dump_leveldb.py --help
+              python tools/dump_localstorage.py --help
+              python tools/dump_sessionstorage.py --help
 #              python utils/populate_teams.py --help
 #              python utils/populate_teams_2.py --help
 #              python utils/populate_skype.py --help

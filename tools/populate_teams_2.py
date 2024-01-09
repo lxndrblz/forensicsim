@@ -10,7 +10,7 @@ import pyautogui
 
 from pywinauto import keyboard
 
-from consts import UTIL_HEADER
+from forensicsim.consts import UTIL_HEADER
 # Teams could be started from script, but requires change owner permissions. Better to launch Teams 2.0 first and
 # then set the focus to the application.
 # os.startfile("C:/Program Files/WindowsApps/MicrosoftTeams_21197.1103.908.5982_x64__8wekyb3d8bbwe/msteams.exe")

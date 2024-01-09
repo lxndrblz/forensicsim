@@ -9,7 +9,7 @@ import click
 import pause
 import pyautogui
 from pywinauto import keyboard
-from consts import UTIL_HEADER
+from forensicsim.consts import UTIL_HEADER
 
 # Avoid the default link as it would update Teams on startup
 os.startfile("C:/Users/forensics/AppData/Local/Microsoft/Teams/current/Teams.exe")

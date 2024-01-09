@@ -26,11 +26,9 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-import click
 from bs4 import BeautifulSoup
 
-from shared import parse_db, write_results_to_json
-from consts import XTRACT_HEADER
+from forensicsim.backend import parse_db, write_results_to_json
 
 MESSAGE_TYPES = {
     "messages": {
@@ -253,7 +251,7 @@ def parse_reply_chain(reply_chains):
                         # Other types include ThreadActivity/TopicUpdate and ThreadActivity/AddMember
                         # -> ThreadActivity/TopicUpdate occurs for meeting updates
                         # -> ThreadActivity/AddMember occurs when someone gets added to a chat
-                    except UnicodeDecodeError or KeyError or NameError as e:
+                    except UnicodeDecodeError or KeyError or NameError:
                         print(
                             "Could not decode the following item in the reply chain (output is not deduplicated)."
                         )
@@ -273,19 +271,18 @@ def parse_conversations(conversations):
             # Include file origin for records
             x["origin_file"] = conversation["origin_file"]
             # Make first at sure that the conversation has a cachedDeduplicationKey
-            if "lastMessage" in conversation["value"]:
+            if "lastMessage" in conversation["value"]:  # noqa: SIM102
                 if (
                     hasattr(conversation["value"]["lastMessage"], "keys")
-                    and "cachedDeduplicationKey"
-                    in conversation["value"]["lastMessage"].keys()
+                    and "cachedDeduplicationKey" in conversation["value"]["lastMessage"]
                 ):
                     x["cachedDeduplicationKey"] = conversation["value"]["lastMessage"][
                         "cachedDeduplicationKey"
                     ]
                     # we are only interested in meetings for now
-                    if x["type"] == "Meeting":
+                    if x["type"] == "Meeting":  # noqa: SIM102
                         # assign the type for further processing as the object store might not be sufficient
-                        if "threadProperties" in x:
+                        if "threadProperties" in x:  # noqa: SIM102
                             if "meeting" in x["threadProperties"]:
                                 x["threadProperties"]["meeting"] = decode_and_loads(
                                     x["threadProperties"]["meeting"]
@@ -345,29 +342,3 @@ def process_db(input_path: Path, output_path: Path):
     extracted_values = parse_db(input_path)
     parsed_records = parse_records(extracted_values)
     write_results_to_json(parsed_records, output_path)
-
-
-@click.command()
-@click.option(
-    "-f",
-    "--filepath",
-    type=click.Path(
-        exists=True, readable=True, writable=False, dir_okay=True, path_type=Path
-    ),
-    required=True,
-    help="File path to the IndexedDB.",
-)
-@click.option(
-    "-o",
-    "--outputpath",
-    type=click.Path(writable=True, path_type=Path),
-    required=True,
-    help="File path to the processed output.",
-)
-def process_cmd(filepath, outputpath):
-    click.echo(XTRACT_HEADER)
-    process_db(filepath, outputpath)
-
-
-if __name__ == "__main__":
-    process_cmd()

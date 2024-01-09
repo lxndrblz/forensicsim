@@ -131,7 +131,7 @@ dump_leveldb.py: error: the following arguments are required: -f/--filepath, -o/
 
 A wee script for populating *Skype for Desktop* in a lab environment. The script can be used like this:
 
-```
+```bash
 utils\populate_skype.py -a 0 -f conversation.json
 ```
 
@@ -139,7 +139,7 @@ utils\populate_skype.py -a 0 -f conversation.json
 
 A wee script for populating *Microsoft Teams* in a lab environment. The script can be used like this:
 
-```
+```bash
 utils\populate_teams.py -a 0 -f conversation.json
 ```
 

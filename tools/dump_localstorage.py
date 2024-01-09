@@ -26,12 +26,12 @@ from pathlib import Path
 
 import click
 
-from consts import DUMP_HEADER
-from shared import parse_sessionstorage, write_results_to_json
+from forensicsim.backend import parse_localstorage, write_results_to_json
+from forensicsim.consts import DUMP_HEADER
 
 
-def process_db(input_path: Path, output_path: Path):
-    extracted_values = parse_sessionstorage(input_path)
+def process_db(filepath: Path, output_path: Path):
+    extracted_values = parse_localstorage(filepath)
     write_results_to_json(extracted_values, output_path)
 
 
@@ -52,7 +52,7 @@ def process_db(input_path: Path, output_path: Path):
     required=True,
     help="File path to the processed output.",
 )
-def process_cmd(filepath, outputpath):
+def process_cmd(filepath: Path, outputpath: Path):
     click.echo(DUMP_HEADER)
     process_db(filepath, outputpath)
 

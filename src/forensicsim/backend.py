@@ -29,10 +29,10 @@ import os
 from chromedb import (
     ccl_blink_value_deserializer,
     ccl_chromium_indexeddb,
-    ccl_v8_value_deserializer,
-    ccl_leveldb,
     ccl_chromium_localstorage,
     ccl_chromium_sessionstorage,
+    ccl_leveldb,
+    ccl_v8_value_deserializer,
 )
 from chromedb.ccl_chromium_indexeddb import (
     DatabaseMetadataType,
@@ -77,19 +77,18 @@ class FastIndexedDB:
             if (
                 record.key.startswith(b"\x00\x00\x00\x00")
                 and record.state == ccl_leveldb.KeyState.Live
+            ) and (
+                record.key not in global_metadata_raw
+                or global_metadata_raw[record.key].seq < record.seq
             ):
-                if (
-                    record.key not in global_metadata_raw
-                    or global_metadata_raw[record.key].seq < record.seq
-                ):
-                    global_metadata_raw[record.key] = record
+                global_metadata_raw[record.key] = record
 
         # Convert the raw metadata to a nice GlobalMetadata Object
         global_metadata = ccl_chromium_indexeddb.GlobalMetadata(global_metadata_raw)
 
         # Loop through the database IDs
         for db_id in global_metadata.db_ids:
-            if None == db_id.dbid_no:
+            if db_id.dbid_no == None:
                 continue
 
             if db_id.dbid_no > 0x7F:
@@ -130,9 +129,11 @@ class FastIndexedDB:
 
                     meta_type = record.key[len(prefix_objectstore) + len(varint_raw)]
 
-                    old_version = objectstore_metadata_raw.get(
-                        (db_id.dbid_no, objstore_id, meta_type)
-                    )
+                    old_version = objectstore_metadata_raw.get((
+                        db_id.dbid_no,
+                        objstore_id,
+                        meta_type,
+                    ))
 
                     if old_version is None or old_version.seq < record.seq:
                         objectstore_metadata_raw[
@@ -160,7 +161,7 @@ class FastIndexedDB:
         # Loop through the databases and object stores based on their ids
         for global_id in self.global_metadata.db_ids:
             # print(f"Processing database: {global_id.name}")
-            if None == global_id.dbid_no:
+            if global_id.dbid_no == None:
                 print(f"WARNING: Skipping database {global_id.name}")
                 continue
 
@@ -188,7 +189,7 @@ class FastIndexedDB:
                             if record.value == b"":
                                 continue
                             (
-                                value_version,
+                                _value_version,
                                 varint_raw,
                             ) = ccl_chromium_indexeddb.le_varint_from_bytes(
                                 record.value
@@ -201,7 +202,7 @@ class FastIndexedDB:
                             val_idx += 1
 
                             (
-                                blink_version,
+                                _blink_version,
                                 varint_raw,
                             ) = ccl_chromium_indexeddb.le_varint_from_bytes(
                                 record.value[val_idx:]
@@ -226,7 +227,7 @@ class FastIndexedDB:
                                     "state": record.state,
                                     "seq": record.seq,
                                 }
-                            except Exception as e:
+                            except Exception:
                                 # TODO Some proper error handling wouldn't hurt
                                 continue
                 # print(f"{datastore} {global_id.name} {records_per_object_store}")
@@ -280,7 +281,7 @@ def write_results_to_json(data, outputpath):
             json.dump(
                 data, f, indent=4, sort_keys=True, default=str, ensure_ascii=False
             )
-    except EnvironmentError as e:
+    except OSError as e:
         print(e)
 
 
@@ -290,5 +291,5 @@ def parse_json():
         with open("teams.json") as json_file:
             data = json.load(json_file)
             return data
-    except EnvironmentError as e:
+    except OSError as e:
         print(e)

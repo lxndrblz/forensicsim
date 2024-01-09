@@ -9,7 +9,7 @@ import pause
 from pywinauto import Desktop, keyboard
 from pywinauto.application import Application
 
-from consts import UTIL_HEADER
+from forensicsim.consts import UTIL_HEADER
 
 logging.basicConfig(
     format="%(asctime)s %(message)s",

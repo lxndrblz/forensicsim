@@ -1,0 +1,78 @@
+[build-system]
+requires = ["setuptools >= 61.0"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name = "forensicsim"
+description = "A forensic open-source parser module for Autopsy that allows extracting the messages, comments, posts, contacts, calendar entries and reactions from a Microsoft Teams IndexedDB LevelDB database."
+readme = "README.md"
+license = {file = "LICENSE.md"}
+requires-python = ">=3.9"
+authors = [
+    { name = "Alexander Bilz", email = "github@markusbilz.com" },
+    { name = "Markus Bilz", email = "github@markusbilz.com" }
+]
+dependencies = [
+"beautifulsoup4~=4.9.3",
+"click~=8.0.1",
+"chromedb @ git+https://github.com/karelze/ccl_chrome_indexeddb@master",
+"pause~=0.3",
+"pyautogui~=0.9.54",
+"pywinauto~=0.6.8"
+]
+
+dynamic = ["version"]
+
+[tool.setuptools.dynamic]
+version = {attr = "forensicsim.__version__"}
+
+[project.urls]
+"Homepage" = "https://forensics.im/"
+"Bug Tracker" = "https://github.com/lxndrblz/forensicsim/issues"
+
+[project.optional-dependencies]
+dev=[
+    "build",
+    "ruff",
+    "pre-commit",
+]
+
+
+[tool.ruff]
+
+target-version = "py39"
+
+# See rules: https://beta.ruff.rs/docs/rules/
+select = [
+    "C",    # flake8-comprehensions
+    "F",    # pyflakes
+    "FURB", # refurb
+    "I",    # isort
+    "PIE",  # misc lints
+    "PT",   # pytest
+    "PGH",  # pygrep
+    "RUF",  # ruff-specific rules
+    "UP",   # pyupgrade
+    "SIM",  # flake8-simplify
+]
+
+include = ["*.py", "*.pyi", "**/pyproject.toml"]
+
+ignore = [
+    "C901",  # too complex
+    "E501",  # line too long, handled by black
+    "D206",  # indent with white space
+    "W191",  # tab identation
+]
+
+[tool.ruff.lint]
+preview = true
+exclude = ["tools/**.py"]
+
+[tool.ruff.format]
+preview = true
+
+[tool.ruff.isort]
+known-first-party = ["forensicsim"]
+section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
