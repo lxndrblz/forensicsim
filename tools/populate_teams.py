@@ -9,6 +9,7 @@ import click
 import pause
 import pyautogui
 from pywinauto import keyboard
+
 from forensicsim.consts import UTIL_HEADER
 
 # Avoid the default link as it would update Teams on startup

@@ -26,8 +26,8 @@ from pathlib import Path
 
 import click
 
-from forensicsim.consts import DUMP_HEADER
 from forensicsim.backend import parse_db, write_results_to_json
+from forensicsim.consts import DUMP_HEADER
 
 
 def process_db(input_path, output_path):

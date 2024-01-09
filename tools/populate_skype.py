@@ -5,7 +5,6 @@ from calendar import timegm
 
 import click
 import pause
-
 from pywinauto import Desktop, keyboard
 from pywinauto.application import Application
 

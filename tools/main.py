@@ -27,8 +27,8 @@ from pathlib import Path
 import click
 
 from forensicsim.backend import parse_db, write_results_to_json
-from forensicsim.parser import parse_records
 from forensicsim.consts import XTRACT_HEADER
+from forensicsim.parser import parse_records
 
 
 def process_db(input_path: Path, output_path: Path):

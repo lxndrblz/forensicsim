@@ -69,7 +69,7 @@ ignore = [
 
 [tool.ruff.lint]
 preview = true
-exclude = ["tools/**.py"]
+# exclude = ["tools/**.py"]
 
 [tool.ruff.format]
 preview = true
