@@ -26,19 +26,12 @@ from pathlib import Path
 
 import click
 
-from consts import DUMP_HEADER
-from shared import parse_db, write_results_to_json
+from forensicsim.backend import parse_sessionstorage, write_results_to_json
+from forensicsim.consts import DUMP_HEADER
 
 
-def process_db(input_path, output_path):
-    # Do some basic error handling
-    if not input_path.parts[-1].endswith(".leveldb"):
-        raise ValueError(f"Expected a leveldb folder. Path: {input_path}")
-
-    # convert the database to a python list with nested dictionaries
-    extracted_values = parse_db(input_path, do_not_filter=True)
-
-    # write the output to a json file
+def process_db(input_path: Path, output_path: Path):
+    extracted_values = parse_sessionstorage(input_path)
     write_results_to_json(extracted_values, output_path)
 
 

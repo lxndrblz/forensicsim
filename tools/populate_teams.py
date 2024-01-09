@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import time
 from calendar import timegm
 from time import sleep
@@ -7,14 +8,12 @@ from time import sleep
 import click
 import pause
 import pyautogui
-
 from pywinauto import keyboard
 
-from consts import UTIL_HEADER
-# Teams could be started from script, but requires change owner permissions. Better to launch Teams 2.0 first and
-# then set the focus to the application.
-# os.startfile("C:/Program Files/WindowsApps/MicrosoftTeams_21197.1103.908.5982_x64__8wekyb3d8bbwe/msteams.exe")
+from forensicsim.consts import UTIL_HEADER
 
+# Avoid the default link as it would update Teams on startup
+os.startfile("C:/Users/forensics/AppData/Local/Microsoft/Teams/current/Teams.exe")
 # Wait for Teams to start
 sleep(50)
 # Maximize the window
@@ -30,8 +29,28 @@ logging.basicConfig(
     level=logging.DEBUG,
 )
 
+# TODO replace with final values
 chat_partner_0 = "JaneDoe@forensics.im"
 chat_partner_1 = "JohnDoe@forensics.im"
+
+
+def select_chat_channel(contact):
+    try:
+        pyautogui.hotkey("ctrl", "n")
+        time.sleep(5)
+        # use pywinauto cause pyautogui cant write an add symbol
+        keyboard.send_keys(contact, with_spaces=True, pause=0.1)
+        # Wait for suggestion to load
+        time.sleep(5)
+        # Confirm suggestion
+        pyautogui.press("enter")
+        time.sleep(3)
+        pyautogui.press("enter")
+        time.sleep(3)
+        # Set focus to the text box
+        # pyautogui.press('tab')
+    except Exception as e:
+        print(e)
 
 
 def send_text_message(message):
@@ -40,7 +59,7 @@ def send_text_message(message):
         # use pywinauto to send non ASCII characters as well
         keyboard.send_keys(message, with_spaces=True)
         keyboard.send_keys("{ENTER}")
-        # logging.info(message)
+        logging.info(message)
     except Exception as e:
         print(e)
 
@@ -50,11 +69,10 @@ def send_media_message(filepath):
         pyautogui.hotkey("ctrl", "o")
         time.sleep(10)
         # TODO Personal version of Teams does not need down/organisational does
-        # pyautogui.press('down')
+        pyautogui.press("down")
         pyautogui.press("enter")
         time.sleep(5)
         pyautogui.write(filepath, interval=0.25)
-        time.sleep(5)
         pyautogui.press("enter")
         time.sleep(30)
         pyautogui.press("enter")
@@ -84,7 +102,7 @@ def react_to_last_message():
         pyautogui.press("esc")
         time.sleep(2)
         pyautogui.press("tab")
-        logging.info("Reacted to last message")
+        logging.info("Reacted with Heart to last message")
     except Exception as e:
         print(e)
 
@@ -102,6 +120,38 @@ def remove_last_message():
         time.sleep(2)
         pyautogui.press("tab")
         logging.info("Removed last message")
+    except Exception as e:
+        print(e)
+
+
+def start_audio_call():
+    try:
+        pyautogui.hotkey("ctrl", "shift", "c")
+        logging.info("Started audio call")
+    except Exception as e:
+        print(e)
+
+
+def end_audio_call():
+    try:
+        pyautogui.hotkey("ctrl", "shift", "b")
+        logging.info("Ended audio call")
+    except Exception as e:
+        print(e)
+
+
+def accept_audio_call():
+    try:
+        pyautogui.hotkey("ctrl", "shift", "s")
+        logging.info("Accepted audio call")
+    except Exception as e:
+        print(e)
+
+
+def decline_audio_call():
+    try:
+        pyautogui.hotkey("ctrl", "shift", "d")
+        logging.info("Declined audio call")
     except Exception as e:
         print(e)
 
@@ -132,17 +182,13 @@ def populate_data_teams(all_data_to_populate, account):
                 if d["Type"] == "delete":
                     remove_last_message()
                 if d["Type"] == "startcall":
-                    # Currently not available in teams 2
-                    pass
+                    start_audio_call()
                 if d["Type"] == "endcall":
-                    # Currently not available in teams 2
-                    pass
+                    end_audio_call()
                 if d["Type"] == "acceptcall":
-                    # Currently not available in teams 2
-                    pass
+                    accept_audio_call()
                 if d["Type"] == "declinecall":
-                    # Currently not available in teams 2
-                    pass
+                    decline_audio_call()
 
 
 # Load conversation History from JSON
