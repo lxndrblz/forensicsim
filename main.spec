@@ -3,7 +3,7 @@
 block_cipher = None
 
 
-a = Analysis(['utils\\main.py'],
+a = Analysis(['tools\\main.py'],
              binaries=[],
              datas=[],
              hiddenimports=[],

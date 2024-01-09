@@ -26,13 +26,18 @@ from pathlib import Path
 
 import click
 
-from shared import parse_localstorage, write_results_to_json
-from consts import DUMP_HEADER
+from forensicsim.backend import parse_db, write_results_to_json
+from forensicsim.consts import XTRACT_HEADER
+from forensicsim.parser import parse_records
 
 
-def process_db(filepath: Path, output_path: Path):
-    extracted_values = parse_localstorage(filepath)
-    write_results_to_json(extracted_values, output_path)
+def process_db(input_path: Path, output_path: Path):
+    if not input_path.parts[-1].endswith(".leveldb"):
+        raise ValueError(f"Expected a leveldb folder. Path: {input_path}")
+
+    extracted_values = parse_db(input_path)
+    parsed_records = parse_records(extracted_values)
+    write_results_to_json(parsed_records, output_path)
 
 
 @click.command()
@@ -52,8 +57,8 @@ def process_db(filepath: Path, output_path: Path):
     required=True,
     help="File path to the processed output.",
 )
-def process_cmd(filepath: Path, outputpath: Path):
-    click.echo(DUMP_HEADER)
+def process_cmd(filepath, outputpath):
+    click.echo(XTRACT_HEADER)
     process_db(filepath, outputpath)
 
 
