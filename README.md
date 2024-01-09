@@ -121,7 +121,6 @@ as following. Simply specify the path to the database and where you want to outp
 
 usage: dump_leveldb.py [-h] -f FILEPATH -o OUTPUTPATH
 dump_leveldb.py: error: the following arguments are required: -f/--filepath, -o/--outputpath
-
 ```
 ---
 
@@ -132,7 +131,7 @@ dump_leveldb.py: error: the following arguments are required: -f/--filepath, -o/
 A wee script for populating *Skype for Desktop* in a lab environment. The script can be used like this:
 
 ```bash
-utils\populate_skype.py -a 0 -f conversation.json
+tools\populate_skype.py -a 0 -f conversation.json
 ```
 
 ## populate_teams.py
@@ -140,7 +139,7 @@ utils\populate_skype.py -a 0 -f conversation.json
 A wee script for populating *Microsoft Teams* in a lab environment. The script can be used like this:
 
 ```bash
-utils\populate_teams.py -a 0 -f conversation.json
+tools\populate_teams.py -a 0 -f conversation.json
 ```
 
 ---
@@ -148,7 +147,6 @@ utils\populate_teams.py -a 0 -f conversation.json
 This repository comes with two datasets that allow reproducing the findings of this work. The `testdata` folder contains the *LevelDB* databases that have been extracted from two test clients. These can be used for benchmarking without having to perform a (lengthy) data population.
 
 The `populationdata` contains *JSON* files of the communication that has been populated into the testing environment. These can be used to reproduce the experiment from scratch. However, for a rerun, it will be essential to adjust the dates to future dates, as the populator script relies on sufficient breaks between the individual messages.
-
 ---
 
 # Acknowledgements & Thanks
