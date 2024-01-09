@@ -14,6 +14,13 @@ repos:
       - id: debug-statements
       - id: end-of-file-fixer
       - id: mixed-line-ending
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        # yaml requires additional stubs.
+        # Similar to: https://stackoverflow.com/a/73603491/5755604
+        additional_dependencies: ['types-PyYAML']
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.1.11
     hooks:

@@ -35,10 +35,24 @@ version = {attr = "forensicsim.__version__"}
 dev=[
     "build",
     "pre-commit",
+    "mypy",
     "ruff",
     "tox",
 ]
 
+[tool.mypy]
+
+python_version = "3.9"
+
+exclude = [
+    "tools/"
+]
+
+# https://github.com/python/mypy/issues/2410
+ignore_missing_imports = true
+disallow_untyped_defs = true
+disallow_untyped_calls = true
+disallow_incomplete_defs = true
 
 [tool.ruff]
 
@@ -103,6 +117,7 @@ commands =
 # Syntax Checks
 [testenv:lint]
 commands =
+    python -m mypy src/
     python -m ruff --output-format=github src
     python -m ruff format src --check
 
