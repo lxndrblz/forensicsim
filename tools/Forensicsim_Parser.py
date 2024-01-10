@@ -238,7 +238,7 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                 # ignore relative paths
                 if child_name == "." or child_name == "..":
                     continue
-                elif child.isFile():
+                elif child.isFile():  # noqa: RET507
                     ContentUtils.writeToFile(child, File(child_path))
                 elif child.isDir():
                     os.mkdir(child_path)
@@ -693,18 +693,16 @@ class ForensicIMIngestModule(DataSourceIngestModule):
         results = file_manager.findFiles(data_source, filename, dir_name)
         if results.isEmpty():
             self.log(Level.INFO, f"Unable to locate {filename}")
-            return
-        db_file = results.get(
+            return None
+        return results.get(
             0
         )  # Expect a single match so retrieve the first (and only) file
-        return db_file
 
     def date_to_long(self, formatted_date):
         # Timestamp
         dt = datetime.strptime(formatted_date[:19], "%Y-%m-%dT%H:%M:%S")
         time_struct = dt.timetuple()
-        timestamp = int(calendar.timegm(time_struct))
-        return timestamp
+        return int(calendar.timegm(time_struct))
 
     # Extract the direction of a phone call
     def deduce_call_direction(self, direction):

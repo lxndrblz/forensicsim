@@ -25,6 +25,7 @@ SOFTWARE.
 import io
 import json
 import os
+from pathlib import Path
 
 from chromedb import (
     ccl_blink_value_deserializer,
@@ -121,7 +122,7 @@ class FastIndexedDB:
                         (
                             objstore_id,
                             varint_raw,
-                        ) = ccl_chromium_indexeddb.le_varint_from_bytes(
+                        ) = ccl_chromium_indexeddb.custom_le_varint_from_bytes(
                             record.key[len(prefix_objectstore) :]
                         )
                     except TypeError:
@@ -191,7 +192,7 @@ class FastIndexedDB:
                             (
                                 _value_version,
                                 varint_raw,
-                            ) = ccl_chromium_indexeddb.le_varint_from_bytes(
+                            ) = ccl_chromium_indexeddb.custom_le_varint_from_bytes(
                                 record.value
                             )
                             val_idx = len(varint_raw)
@@ -202,9 +203,9 @@ class FastIndexedDB:
                             val_idx += 1
 
                             (
-                                _blink_version,
+                                _,
                                 varint_raw,
-                            ) = ccl_chromium_indexeddb.le_varint_from_bytes(
+                            ) = ccl_chromium_indexeddb.custom_le_varint_from_bytes(
                                 record.value[val_idx:]
                             )
 
@@ -247,7 +248,7 @@ def parse_localstorage(filepath):
     extracted_values = []
     for record in local_store.iter_all_records():
         try:
-            extracted_values.append(json.loads(record.value))
+            extracted_values.append(json.loads(record.value, strict=False))
         except json.decoder.JSONDecodeError:
             continue
     return extracted_values
@@ -288,8 +289,7 @@ def write_results_to_json(data, outputpath):
 def parse_json():
     # read data from a file. This is only for testing purpose.
     try:
-        with open("teams.json") as json_file:
-            data = json.load(json_file)
-            return data
+        with Path("teams.json").open() as json_file:
+            return json.load(json_file)
     except OSError as e:
         print(e)

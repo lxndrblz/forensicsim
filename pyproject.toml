@@ -17,6 +17,7 @@ dependencies = [
 "beautifulsoup4",
 "click",
 "chromedb @ git+https://github.com/karelze/ccl_chrome_indexeddb@master",
+"dataclasses-json",
 "pause",
 "pyautogui",
 "pywinauto"
@@ -50,12 +51,13 @@ select = [
     "F",    # pyflakes
     "FURB", # refurb
     "I",    # isort
-    "PIE",  # misc lints
-    "PT",   # pytest
     "PGH",  # pygrep
+    "PIE",  # misc lints
+#    "PTH",  # flake8-use-pathlib
+    "RET",  # return
     "RUF",  # ruff-specific rules
-    "UP",   # pyupgrade
     "SIM",  # flake8-simplify
+    "UP",   # pyupgrade
 ]
 
 include = ["*.py", "*.pyi", "**/pyproject.toml"]
