@@ -126,7 +126,7 @@ class FastIndexedDB:
                         (
                             objstore_id,
                             varint_raw,
-                        ) = ccl_chromium_indexeddb.le_varint_from_bytes(
+                        ) = ccl_chromium_indexeddb.custom_le_varint_from_bytes(
                             record.key[len(prefix_objectstore) :]
                         )
                     except TypeError:
@@ -198,7 +198,7 @@ class FastIndexedDB:
                             (
                                 _value_version,
                                 varint_raw,
-                            ) = ccl_chromium_indexeddb.le_varint_from_bytes(
+                            ) = ccl_chromium_indexeddb.custom_le_varint_from_bytes(
                                 record.value
                             )
                             val_idx = len(varint_raw)
@@ -211,7 +211,7 @@ class FastIndexedDB:
                             (
                                 _,
                                 varint_raw,
-                            ) = ccl_chromium_indexeddb.le_varint_from_bytes(
+                            ) = ccl_chromium_indexeddb.custom_le_varint_from_bytes(
                                 record.value[val_idx:]
                             )
 
@@ -249,7 +249,7 @@ def parse_localstorage(filepath: Path) -> list[dict]:
     extracted_values = []
     for record in local_store.iter_all_records():
         try:
-            extracted_values.append(json.loads(record.value))
+            extracted_values.append(json.loads(record.value, strict=False))
         except json.decoder.JSONDecodeError:
             continue
     return extracted_values

@@ -130,4 +130,4 @@ dmypy.json
 venv/
 env/
 
-testing/
+test/

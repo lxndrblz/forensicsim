@@ -2,38 +2,45 @@ on:
   push:
 jobs:
   build:
-    name: Build exectuable 📦
-    runs-on: windows-latest
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: recursive
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.9"
-    - name: Install dependencies
-      run: |
-            python -m pip install --upgrade pip
-            python -m pip install .[dev] pyinstaller
-    - name: Lint code 🦄
-      run: tox -e lint
-    - name: Build binary 🔢
-      run:  pyinstaller "main.spec"
-    - name: Run conversion ↩️
-      run: |
-           .\dist\ms_teams_parser.exe -f ".\forensicsim-data\jane_doe_v_1_4_00_11161\IndexedDB\https_teams.microsoft.com_0.indexeddb.leveldb" -o "jane_doe.json"
-           .\dist\ms_teams_parser.exe -f ".\forensicsim-data\john_doe_v_1_4_00_11161\IndexedDB\https_teams.microsoft.com_0.indexeddb.leveldb" -o "john_doe.json"
-           .\dist\ms_teams_parser.exe -f ".\forensicsim-data\karelze_v_23306_3309_2530_1346\IndexedDB\https_teams.live.com_0.indexeddb.leveldb" -o "karelze.json"
-           .\dist\ms_teams_parser.exe -f ".\forensicsim-data\mboufahja_v_23231_413_2355_7555\IndexedDB\https_teams.microsoft.com_0.indexeddb.leveldb" -o "mboufahja.json"
-    - name: Test calling script 📞
-      run: |
-            python tools/main.py --help
-            python tools/dump_leveldb.py --help
-            python tools/dump_localstorage.py --help
-            python tools/dump_sessionstorage.py --help
-#           python utils/populate_teams.py --help
-#           python utils/populate_teams_2.py --help
-#           python utils/populate_skype.py --help
-    # - name: Calculate diff 👽
-    #   run: git diff --no-index --word-diff expected_output/john_doe.json current_output.json
+      name: Build exectuable 📦
+      runs-on: windows-latest
+      steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+      - name: Install dependencies
+        run: |
+              python -m pip install --upgrade pip
+              python -m pip install .[dev] pyinstaller
+      - name: Lint code 🦄
+        run: tox -e lint
+      - name: Build binary 🔢
+        run:  pyinstaller "main.spec"
+      - name: Run conversion ↩️
+        run: |
+             .\dist\ms_teams_parser.exe -f ".\forensicsim-data\jane_doe_v_1_4_00_11161\IndexedDB\https_teams.microsoft.com_0.indexeddb.leveldb" -o "jane_doe_v_1_4_00_11161.json"
+             .\dist\ms_teams_parser.exe -f ".\forensicsim-data\john_doe_v_1_4_00_11161\IndexedDB\https_teams.microsoft.com_0.indexeddb.leveldb" -o "john_doe_v_1_4_00_11161.json"
+             .\dist\ms_teams_parser.exe -f ".\forensicsim-data\karelze_v_23306_3309_2530_1346\IndexedDB\https_teams.live.com_0.indexeddb.leveldb" -o "karelze.json"
+             .\dist\ms_teams_parser.exe -f ".\forensicsim-data\mboufahja_v_23231_413_2355_7555\IndexedDB\https_teams.microsoft.com_0.indexeddb.leveldb" -o "mboufahja.json"
+      - name: Upload results📲
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-outputs
+          path: |
+              jane_doe_v_1_4_00_11161.json
+              john_doe_v_1_4_00_11161.json
+          retention-days: 1
+      - name: Test calling script 📞
+        run: |
+              python tools/main.py --help
+              python tools/dump_leveldb.py --help
+              python tools/dump_localstorage.py --help
+              python tools/dump_sessionstorage.py --help
+      - name: Calculate diff 👽
+        run: | 
+            git diff --no-index --word-diff .\forensicsim-data\expected-result\jane_doe_v_1_4_00_11161.json jane_doe_v_1_4_00_11161.json
+            git diff --no-index --word-diff .\forensicsim-data\expected-result\john_doe_v_1_4_00_11161.json john_doe_v_1_4_00_11161.json
