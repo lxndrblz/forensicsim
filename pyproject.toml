@@ -14,7 +14,7 @@ authors = [
     { name = "Markus Bilz", email = "github@markusbilz.com" }
 ]
 dependencies = [
-"beautifulsoup4~=4.9.3",
+"beautifulsoup4~=4.12.2",
 "click~=8.1.7",
 "chromedb @ git+https://github.com/karelze/ccl_chrome_indexeddb@master",
 "pause~=0.3",
