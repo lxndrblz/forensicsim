@@ -226,10 +226,10 @@ def parse_records(records: list[dict]) -> list[dict]:
 
     # sort within groups i.e., Contacts, Meetings, Conversations
     parsed_records = (
-        _parse_people(people)
-        | _parse_buddies(buddies)
-        | _parse_reply_chains(reply_chains)
-        | _parse_conversations(conversations)
+        sorted(_parse_people(people))
+        + sorted(_parse_buddies(buddies))
+        + sorted(_parse_reply_chains(reply_chains))
+        + sorted(_parse_conversations(conversations))
     )
     return [r.to_dict() for r in parsed_records]
 
