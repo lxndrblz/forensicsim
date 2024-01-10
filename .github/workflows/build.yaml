@@ -31,6 +31,7 @@ jobs:
           path: |
               jane_doe_v_1_4_00_11161.json
               john_doe_v_1_4_00_11161.json
+          retention-days: 1
       - name: Test calling script 📞
         run: |
               python tools/main.py --help
@@ -39,5 +40,5 @@ jobs:
               python tools/dump_sessionstorage.py --help
       - name: Calculate diff 👽
         run: | 
-            git diff --no-index --word-diff \forensicsim-data\expected-result\jane_doe_v_1_4_00_11161.json jane_doe_v_1_4_00_11161.json
-            git diff --no-index --word-diff \forensicsim-data\expected-result\john_doe_v_1_4_00_11161.json john_doe_v_1_4_00_11161.json
+            git diff --no-index --word-diff \forensicsim-data\expected-result\jane_doe_v_1_4_00_11161 jane_doe_v_1_4_00_11161.json
+            git diff --no-index --word-diff \forensicsim-data\expected-result\john_doe_v_1_4_00_11161 john_doe_v_1_4_00_11161.json
