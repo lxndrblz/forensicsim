@@ -39,5 +39,5 @@ jobs:
               python tools/dump_sessionstorage.py --help
       - name: Calculate diff 👽
         run: | 
-            git diff --no-index --word-diff \forensicsim-data\jane_doe_v_1_4_00_11161\expected_result.json jane_doe_v_1_4_00_11161.json
-            git diff --no-index --word-diff \forensicsim-data\john_doe_v_1_4_00_11161\expected_result.json john_doe_v_1_4_00_11161.json
+            git diff --no-index --word-diff \forensicsim-data\expected-result\jane_doe_v_1_4_00_11161.json jane_doe_v_1_4_00_11161.json
+            git diff --no-index --word-diff \forensicsim-data\expected-result\john_doe_v_1_4_00_11161.json john_doe_v_1_4_00_11161.json
