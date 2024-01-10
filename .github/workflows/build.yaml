@@ -22,16 +22,22 @@ jobs:
         run:  pyinstaller "main.spec"
       - name: Run conversion ↩️
         run: |
-             .\dist\ms_teams_parser.exe -f ".\forensicsim-data\jane_doe_v_1_4_00_11161\IndexedDB\https_teams.microsoft.com_0.indexeddb.leveldb" -o "jane_doe.json"
-             .\dist\ms_teams_parser.exe -f ".\forensicsim-data\john_doe_v_1_4_00_11161\IndexedDB\https_teams.microsoft.com_0.indexeddb.leveldb" -o "john_doe.json"
+             .\dist\ms_teams_parser.exe -f ".\forensicsim-data\jane_doe_v_1_4_00_11161\IndexedDB\https_teams.microsoft.com_0.indexeddb.leveldb" -o "jane_doe_v_1_4_00_11161.json"
+             .\dist\ms_teams_parser.exe -f ".\forensicsim-data\john_doe_v_1_4_00_11161\IndexedDB\https_teams.microsoft.com_0.indexeddb.leveldb" -o "john_doe_v_1_4_00_11161.json"
+      - name: Upload results📲
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-outputs
+          path: |
+              jane_doe_v_1_4_00_11161.json
+              john_doe_v_1_4_00_11161.json
       - name: Test calling script 📞
         run: |
               python tools/main.py --help
               python tools/dump_leveldb.py --help
               python tools/dump_localstorage.py --help
               python tools/dump_sessionstorage.py --help
-#              python utils/populate_teams.py --help
-#              python utils/populate_teams_2.py --help
-#              python utils/populate_skype.py --help
-      # - name: Calculate diff 👽
-      #   run: git diff --no-index --word-diff expected_output/john_doe.json current_output.json
+      - name: Calculate diff 👽
+        run: | 
+            git diff --no-index --word-diff \forensicsim-data\jane_doe_v_1_4_00_11161\expected_result.json jane_doe_v_1_4_00_11161.json
+            git diff --no-index --word-diff \forensicsim-data\john_doe_v_1_4_00_11161\expected_result.json john_doe_v_1_4_00_11161.json
