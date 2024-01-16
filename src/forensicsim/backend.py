@@ -284,5 +284,4 @@ def write_results_to_json(data: object, outputpath: Path) -> None:
 def parse_json() -> Any:
     # read data from a file. This is only for testing purpose.
     with Path("teams.json").open() as json_file:
-        data = json.load(json_file)
-    return data
+        return json.load(json_file)

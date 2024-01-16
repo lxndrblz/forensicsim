@@ -46,7 +46,7 @@ dev=[
 python_version = "3.9"
 
 exclude = [
-    "tools/"
+    "tools/**.py"
 ]
 
 # https://github.com/python/mypy/issues/2410

@@ -41,6 +41,6 @@ jobs:
               python tools/dump_localstorage.py --help
               python tools/dump_sessionstorage.py --help
       - name: Calculate diff 👽
-        run: | 
+        run: |
             git diff --no-index --word-diff .\forensicsim-data\expected-result\jane_doe_v_1_4_00_11161.json jane_doe_v_1_4_00_11161.json
             git diff --no-index --word-diff .\forensicsim-data\expected-result\john_doe_v_1_4_00_11161.json john_doe_v_1_4_00_11161.json
