@@ -20,7 +20,7 @@ dependencies = [
 "dataclasses-json",
 "pause",
 "pyautogui",
-# "pywinauto"
+"pywinauto"
 ]
 
 dynamic = ["version"]
