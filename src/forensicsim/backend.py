@@ -22,22 +22,13 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-import io
 import json
-import os
 from pathlib import Path
 
 from chromedb import (
-    ccl_blink_value_deserializer,
     ccl_chromium_indexeddb,
     ccl_chromium_localstorage,
     ccl_chromium_sessionstorage,
-    ccl_leveldb,
-    ccl_v8_value_deserializer,
-)
-from chromedb.ccl_chromium_indexeddb import (
-    DatabaseMetadataType,
-    ObjectStoreMetadataType,
 )
 
 TEAMS_DB_OBJECT_STORES = ["replychains", "conversations", "people", "buddylist"]
@@ -53,6 +44,7 @@ It uses an optimized enumeration approach for processing the metadata, which mak
 
 Additionally, it has a flag to filter for datastores, which are interesting for us.
 """
+
 
 def parse_db(filepath, do_not_filter=False):
     # Open raw access to a LevelDB and deserialize the records.
@@ -80,8 +72,17 @@ def parse_db(filepath, do_not_filter=False):
                     # TODO: Fix None values
                     state = None
                     seq = None
-                    extracted_values.append({"key": record.key.raw_key, "value": record.value, "origin_file": sourcefile, "store": obj_store_name, "state": state, "seq": seq})
-                print(f"{obj_store_name} {db.name} (Records: {records_per_object_store})") 
+                    extracted_values.append({
+                        "key": record.key.raw_key,
+                        "value": record.value,
+                        "origin_file": sourcefile,
+                        "store": obj_store_name,
+                        "state": state,
+                        "seq": seq,
+                    })
+                print(
+                    f"{obj_store_name} {db.name} (Records: {records_per_object_store})"
+                )
     return extracted_values
 
 

@@ -31,7 +31,7 @@ from forensicsim.consts import XTRACT_HEADER
 from forensicsim.parser import parse_records
 
 
-def process_db(input_path: Path, output_path: Path):
+def process_db(input_path: Path, output_path: Path) -> None:
     if not input_path.parts[-1].endswith(".leveldb"):
         raise ValueError(f"Expected a leveldb folder. Path: {input_path}")
 
@@ -57,7 +57,7 @@ def process_db(input_path: Path, output_path: Path):
     required=True,
     help="File path to the processed output.",
 )
-def process_cmd(filepath, outputpath):
+def process_cmd(filepath: Path, outputpath: Path) -> None:
     click.echo(XTRACT_HEADER)
     process_db(filepath, outputpath)
 
