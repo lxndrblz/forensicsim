@@ -1,10 +1,11 @@
 import json
+import warnings
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, MarkupResemblesLocatorWarning
 from dataclasses_json import (
     DataClassJsonMixin,
     LetterCase,
@@ -14,6 +15,8 @@ from dataclasses_json import (
 
 from forensicsim.backend import parse_db, write_results_to_json
 
+# Suppress Beautiful Soup warnings
+warnings.filterwarnings('ignore', category=MarkupResemblesLocatorWarning)
 
 def strip_html_tags(value):
     # Get the text of any embedded html, such as divs, a href links
@@ -121,10 +124,6 @@ class Message(DataClassJsonMixin):
             self.cached_deduplication_key = str(self.creator) + str(
                 self.clientmessageid
             )
-        if "call-log" in self.properties:
-            self.record_type = "call"
-        if "activity" in self.properties:
-            self.record_type = "reaction"
 
     def __eq__(self, other):
         return self.cached_deduplication_key == other.cached_deduplication_key
@@ -165,8 +164,14 @@ class Contact(DataClassJsonMixin):
 def _parse_people(people: list[dict]) -> set[Contact]:
     parsed_people = set()
     for p in people:
-        p |= {"origin_file": p.get("origin_file")}
+ 
         p |= p.get("value", {})
+        p |= {"display_name": p.get("displayName")}
+        p |= {"email": p.get("email")}
+        p |= {"mri": p.get("mri")}
+        p |= {"user_principal_name": p.get("userPrincipalName")}
+        p |= {"origin_file": p.get("origin_file")}
+
         parsed_people.add(Contact.from_dict(p))
     return parsed_people
 
@@ -176,6 +181,7 @@ def _parse_buddies(buddies: list[dict]) -> set[Contact]:
     for b in buddies:
         buddies_of_b = b.get("value", {}).get("buddies", [])
         for b_of_b in buddies_of_b:
+
             b_of_b |= {"origin_file": b.get("origin_file")}
             parsed_buddies.add(Contact.from_dict(b_of_b))
     return parsed_buddies
@@ -184,29 +190,61 @@ def _parse_buddies(buddies: list[dict]) -> set[Contact]:
 def _parse_conversations(conversations: list[dict]) -> set[Meeting]:
     cleaned_conversations = set()
     for c in conversations:
-        last_message = c.get("value", {}).get("lastMessage", {})
 
-        c |= {
-            "cachedDeduplicationKey": last_message.get("cachedDeduplicationKey"),
-        }
 
-        if c.get("type", "") == "Meeting" and "meeting" in c.get(
+        if c.get("value", {}).get("type", "") == "Meeting" and "meeting" in c.get("value", {}).get(
             "threadProperties", {}
         ):
+            last_message = c.get("value", {}).get("lastMessage", {})
+            meeting_properties = c.get("value", {}).get("threadProperties", {})
+            c |= c.get("value", {})
+            c |= {"client_update_time": c.get("clientUpdateTime")}
+            c |= {"id": c.get("id")}
+            c |= {"members": c.get("members")}
+            c |= {"thread_properties": meeting_properties}
+            c |= {"client_update_time": c.get("clientUpdateTime")}
+            c |= {"version": c.get("version")}
+            c |= {"last_message": last_message}
+            c |= {"cached_deduplication_key": c.get("id")}
             cleaned_conversations.add(Meeting.from_dict(c))
-
     return cleaned_conversations
 
 
 def _parse_reply_chains(reply_chains: list[dict]) -> set[Message]:
     cleaned_reply_chains = set()
-
     for rc in reply_chains:
-        for message_values in rc.get("value", {}).get("messages", {}).values():
-            message_values |= {
-                "origin_file": rc.get("origin_file"),
-            }
-            cleaned_reply_chains.add(Message.from_dict(message_values))
+        rc |= {"origin_file": rc.get("origin_file")}
+        
+        message_dict = {}
+        if rc.get("value", {}).get("messageMap", {}) or rc.get("value", {}).get("messages", {}):
+            if rc.get("value", {}).get("messageMap", {}):
+                message_dict = rc.get("value", {}).get("messageMap", {})
+            else:
+                message_dict = rc.get("value", {}).get("messages", {})
+
+        for k in message_dict:
+            md = message_dict[k]
+
+            if md.get("messageType", "") == "RichText/Html" or md.get("messageType", "") == "Text":
+                rc |= rc.get("value", {})
+                rc |= {"cached_deduplication_key": md.get("dedupeKey")}
+                rc |= {"clientmessageid": md.get("clientMessageId")}
+                rc |= {"composetime": md.get("clientArrivalTime")}
+                rc |= {"conversation_id": md.get("conversationId")}
+                rc |= {"content": md.get("content")}
+                rc |= {"contenttype": md.get("contentType")}
+                rc |= {"created_time": md.get("clientArrivalTime")}
+                rc |= {"creator": md.get("version")}
+                rc |= {"is_from_me": md.get("isSentByCurrentUser")}
+                rc |= {"messagetype": md.get("messageType")}
+                rc |= {"originalArrivalTime": md.get("version")}
+                rc |= {"client_arrival_time": md.get("clientArrivalTime")}
+                rc |= {"original_arrival_time": md.get("clientArrivalTime")}
+                rc |= {"version": md.get("version")}
+                rc |= {"properties": md.get("properties")}
+            
+            cleaned_reply_chains.add(Message.from_dict(rc))
+
     return cleaned_reply_chains
 
 
@@ -227,7 +265,7 @@ def parse_records(records: list[dict]) -> list[dict]:
     # sort within groups i.e., Contacts, Meetings, Conversations
     parsed_records = (
         sorted(_parse_people(people))
-        + sorted(_parse_buddies(buddies))
+    #    + sorted(_parse_buddies(buddies))
         + sorted(_parse_reply_chains(reply_chains))
         + sorted(_parse_conversations(conversations))
     )

@@ -1,281 +1,137 @@
-import json
-import warnings
-from dataclasses import dataclass, field
-from datetime import datetime
-from pathlib import Path
-from typing import Any, Optional
+"""
+MIT License
 
-from bs4 import BeautifulSoup, MarkupResemblesLocatorWarning
-from dataclasses_json import (
-    DataClassJsonMixin,
-    LetterCase,
-    Undefined,
-    config,
+Copyright (c) 2021 Alexander Bilz
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+"""
+
+import io
+import json
+import os
+from pathlib import Path
+
+from chromedb import (
+    ccl_blink_value_deserializer,
+    ccl_chromium_indexeddb,
+    ccl_chromium_localstorage,
+    ccl_chromium_sessionstorage,
+    ccl_leveldb,
+    ccl_v8_value_deserializer,
+)
+from chromedb.ccl_chromium_indexeddb import (
+    DatabaseMetadataType,
+    ObjectStoreMetadataType,
 )
 
-from forensicsim.backend import parse_db, write_results_to_json
+TEAMS_DB_OBJECT_STORES = ["replychains", "conversations", "people", "buddylist"]
 
-# Suppress Beautiful Soup warnings
-warnings.filterwarnings('ignore', category=MarkupResemblesLocatorWarning)
+ENCODING = "iso-8859-1"
 
-def strip_html_tags(value):
-    # Get the text of any embedded html, such as divs, a href links
-    soup = BeautifulSoup(value, features="html.parser")
-    return soup.get_text()
+"""
+The following code is heavily adopted from the RawLevelDb and IndexedDB processing proposed by CCL Group
 
+https://github.com/cclgroupltd/ccl_chrome_indexeddb/blob/35b6a9efba1078cf339f9e64d2796b1f5f7c556f/ccl_chromium_indexeddb.py
 
-def decode_dict(properties):
-    if isinstance(properties, bytes):
-        soup = BeautifulSoup(properties, features="html.parser")
-        properties = properties.decode(soup.original_encoding)
-    if isinstance(properties, dict):
-        # handle case where nested childs are dicts or list but provided with "" but have to be expanded.
-        for key, value in properties.items():
-            if isinstance(value, str) and value.startswith(("[", "{")):
-                properties[key] = json.loads(value, strict=False)
-        return properties
+It uses an optimized enumeration approach for processing the metadata, which makes the original IndexedDB super slow.
 
-    return json.loads(properties, strict=False)
+Additionally, it has a flag to filter for datastores, which are interesting for us.
+"""
 
+def parse_db(filepath, do_not_filter=False):
+    # Open raw access to a LevelDB and deserialize the records.
+    wrapper = ccl_chromium_indexeddb.WrappedIndexDB(filepath)
 
-def decode_timestamp(content_utf8_encoded) -> datetime:
-    return datetime.utcfromtimestamp(int(content_utf8_encoded) / 1000)
+    extracted_values = []
 
+    for db_info in wrapper.database_ids:
+        # Skip databases without a valid dbid_no
+        if db_info.dbid_no is None:
+            continue
 
-def encode_timestamp(timestamp) -> Optional[str]:
-    if timestamp is not None:
-        return timestamp.strftime("%Y-%m-%dT%H:%M:%S.%f")
-    return None
+        db = wrapper[db_info.dbid_no]
 
-
-JSON_CONFIG = config(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)[
-    "dataclasses_json"
-]
-
-
-@dataclass()
-class Meeting(DataClassJsonMixin):
-    dataclass_json_config = JSON_CONFIG
-
-    client_update_time: Optional[str] = None
-    cached_deduplication_key: Optional[str] = None
-    id: Optional[str] = None
-    members: Optional[list[dict]] = None
-    thread_properties: dict[str, Any] = field(
-        default_factory=dict, metadata=config(decoder=decode_dict)
-    )
-    type: Optional[str] = None
-    version: Optional[float] = None
-
-    record_type: Optional[str] = field(
-        default="meeting", metadata=config(field_name="record_type")
-    )
-
-    def __eq__(self, other):
-        return self.cached_deduplication_key == other.cachedDeduplicationKey
-
-    def __hash__(self):
-        return hash(self.cached_deduplication_key)
-
-    def __lt__(self, other):
-        return self.cached_deduplication_key < other.cached_deduplication_key
+        for obj_store_name in db.object_store_names:
+            # Skip empty object stores
+            if obj_store_name is None:
+                continue
+            if obj_store_name in TEAMS_DB_OBJECT_STORES or do_not_filter:
+                obj_store = db[obj_store_name]
+                records_per_object_store = 0
+                for record in obj_store.iterate_records():
+                    records_per_object_store += 1
+                    sourcefile = str(filepath)
+                    # TODO: Fix None values
+                    state = None
+                    seq = None
+                    extracted_values.append({"key": record.key.raw_key, "value": record.value, "origin_file": sourcefile, "store": obj_store_name, "state": state, "seq": seq})
+                print(f"{obj_store_name} {db.name} (Records: {records_per_object_store})") 
+    return extracted_values
 
 
-@dataclass()
-class Message(DataClassJsonMixin):
-    dataclass_json_config = JSON_CONFIG
+def parse_localstorage(filepath):
+    local_store = ccl_chromium_localstorage.LocalStoreDb(filepath)
+    extracted_values = []
+    for record in local_store.iter_all_records():
+        try:
+            extracted_values.append(json.loads(record.value, strict=False))
+        except json.decoder.JSONDecodeError:
+            continue
+    return extracted_values
 
-    attachments: list[Any] = field(default_factory=list)
-    cached_deduplication_key: Optional[str] = None
-    client_arrival_time: Optional[str] = None
-    clientmessageid: Optional[str] = None
-    composetime: Optional[str] = None
-    conversation_id: Optional[str] = None
-    content: Optional[str] = field(
-        default=None, metadata=config(decoder=strip_html_tags)
-    )
-    contenttype: Optional[str] = None
-    created_time: Optional[datetime] = field(
-        default=None,
-        metadata=config(decoder=decode_timestamp, encoder=encode_timestamp),
-    )
-    creator: Optional[str] = None
-    is_from_me: Optional[bool] = None
-    message_kind: Optional[str] = None
-    messagetype: Optional[str] = None
-    originalarrivaltime: Optional[str] = None
-    properties: dict[str, Any] = field(
-        default_factory=dict, metadata=config(decoder=decode_dict)
-    )
-    version: Optional[datetime] = field(
-        default=None,
-        metadata=config(decoder=decode_timestamp, encoder=encode_timestamp),
-    )
 
-    origin_file: Optional[str] = field(
-        default=None, metadata=config(field_name="origin_file")
-    )
-    record_type: str = field(
-        default="message", metadata=config(field_name="record_type")
-    )
+def parse_sessionstorage(filepath):
+    session_storage = ccl_chromium_sessionstorage.SessionStoreDb(filepath)
+    extracted_values = []
+    for host in session_storage:
+        print(host)
+        # Hosts can have multiple sessions associated with them
+        for session_store_values in session_storage.get_all_for_host(host).values():
+            for session_store_value in session_store_values:
+                # response is of type SessionStoreValue
 
-    def __post_init__(self):
-        if self.cached_deduplication_key is None:
-            self.cached_deduplication_key = str(self.creator) + str(
-                self.clientmessageid
+                # Make a nice dictionary out of it
+                entry = {
+                    "key": host,
+                    "value": session_store_value.value,
+                    "guid": session_store_value.guid,
+                    "leveldb_sequence_number": session_store_value.leveldb_sequence_number,
+                }
+                extracted_values.append(entry)
+    return extracted_values
+
+
+def write_results_to_json(data, outputpath):
+    # Dump messages into a json file
+    try:
+        with open(outputpath, "w", encoding="utf-8") as f:
+            json.dump(
+                data, f, indent=4, sort_keys=True, default=str, ensure_ascii=False
             )
-
-    def __eq__(self, other):
-        return self.cached_deduplication_key == other.cached_deduplication_key
-
-    def __hash__(self):
-        return hash(self.cached_deduplication_key)
-
-    def __lt__(self, other):
-        return self.cached_deduplication_key < other.cached_deduplication_key
+    except OSError as e:
+        print(e)
 
 
-@dataclass()
-class Contact(DataClassJsonMixin):
-    dataclass_json_config = JSON_CONFIG
-
-    display_name: Optional[str] = None
-    email: Optional[str] = None
-    mri: Optional[str] = field(default=None, compare=True)
-    user_principal_name: Optional[str] = None
-
-    origin_file: Optional[str] = field(
-        default=None, metadata=config(field_name="origin_file")
-    )
-    record_type: Optional[str] = field(
-        default="contact", metadata=config(field_name="record_type")
-    )
-
-    def __eq__(self, other):
-        return self.mri == other.mri
-
-    def __hash__(self):
-        return hash(self.mri)
-
-    def __lt__(self, other):
-        return self.mri < other.mri
-
-
-def _parse_people(people: list[dict]) -> set[Contact]:
-    parsed_people = set()
-    for p in people:
- 
-        p |= p.get("value", {})
-        p |= {"display_name": p.get("displayName")}
-        p |= {"email": p.get("email")}
-        p |= {"mri": p.get("mri")}
-        p |= {"user_principal_name": p.get("userPrincipalName")}
-        p |= {"origin_file": p.get("origin_file")}
-
-        parsed_people.add(Contact.from_dict(p))
-    return parsed_people
-
-
-def _parse_buddies(buddies: list[dict]) -> set[Contact]:
-    parsed_buddies = set()
-    for b in buddies:
-        buddies_of_b = b.get("value", {}).get("buddies", [])
-        for b_of_b in buddies_of_b:
-
-            b_of_b |= {"origin_file": b.get("origin_file")}
-            parsed_buddies.add(Contact.from_dict(b_of_b))
-    return parsed_buddies
-
-
-def _parse_conversations(conversations: list[dict]) -> set[Meeting]:
-    cleaned_conversations = set()
-    for c in conversations:
-
-
-        if c.get("value", {}).get("type", "") == "Meeting" and "meeting" in c.get("value", {}).get(
-            "threadProperties", {}
-        ):
-            last_message = c.get("value", {}).get("lastMessage", {})
-            meeting_properties = c.get("value", {}).get("threadProperties", {})
-            c |= c.get("value", {})
-            c |= {"client_update_time": c.get("clientUpdateTime")}
-            c |= {"id": c.get("id")}
-            c |= {"members": c.get("members")}
-            c |= {"thread_properties": meeting_properties}
-            c |= {"client_update_time": c.get("clientUpdateTime")}
-            c |= {"version": c.get("version")}
-            c |= {"last_message": last_message}
-            c |= {"cached_deduplication_key": c.get("id")}
-            cleaned_conversations.add(Meeting.from_dict(c))
-    return cleaned_conversations
-
-
-def _parse_reply_chains(reply_chains: list[dict]) -> set[Message]:
-    cleaned_reply_chains = set()
-    for rc in reply_chains:
-        rc |= {"origin_file": rc.get("origin_file")}
-        
-        message_dict = {}
-        if rc.get("value", {}).get("messageMap", {}) or rc.get("value", {}).get("messages", {}):
-            if rc.get("value", {}).get("messageMap", {}):
-                message_dict = rc.get("value", {}).get("messageMap", {})
-            else:
-                message_dict = rc.get("value", {}).get("messages", {})
-
-        for k in message_dict:
-            md = message_dict[k]
-
-            if md.get("messageType", "") == "RichText/Html" or md.get("messageType", "") == "Text":
-                rc |= rc.get("value", {})
-                rc |= {"cached_deduplication_key": md.get("dedupeKey")}
-                rc |= {"clientmessageid": md.get("clientMessageId")}
-                rc |= {"composetime": md.get("clientArrivalTime")}
-                rc |= {"conversation_id": md.get("conversationId")}
-                rc |= {"content": md.get("content")}
-                rc |= {"contenttype": md.get("contentType")}
-                rc |= {"created_time": md.get("clientArrivalTime")}
-                rc |= {"creator": md.get("version")}
-                rc |= {"is_from_me": md.get("isSentByCurrentUser")}
-                rc |= {"messagetype": md.get("messageType")}
-                rc |= {"originalArrivalTime": md.get("version")}
-                rc |= {"client_arrival_time": md.get("clientArrivalTime")}
-                rc |= {"original_arrival_time": md.get("clientArrivalTime")}
-                rc |= {"version": md.get("version")}
-                rc |= {"properties": md.get("properties")}
-            
-            cleaned_reply_chains.add(Message.from_dict(rc))
-
-    return cleaned_reply_chains
-
-
-def parse_records(records: list[dict]) -> list[dict]:
-    people, buddies, reply_chains, conversations = [], [], [], []
-
-    for r in records:
-        store = r.get("store", "other")
-        if store == "people":
-            people.append(r)
-        elif store == "buddylist":
-            buddies.append(r)
-        elif store == "replychains":
-            reply_chains.append(r)
-        elif store == "conversations":
-            conversations.append(r)
-
-    # sort within groups i.e., Contacts, Meetings, Conversations
-    parsed_records = (
-        sorted(_parse_people(people))
-    #    + sorted(_parse_buddies(buddies))
-        + sorted(_parse_reply_chains(reply_chains))
-        + sorted(_parse_conversations(conversations))
-    )
-    return [r.to_dict() for r in parsed_records]
-
-
-def process_db(input_path: Path, output_path: Path):
-    if not input_path.parts[-1].endswith(".leveldb"):
-        raise ValueError(f"Expected a leveldb folder. Path: {input_path}")
-
-    extracted_values = parse_db(input_path)
-    parsed_records = parse_records(extracted_values)
-    write_results_to_json(parsed_records, output_path)
+def parse_json():
+    # read data from a file. This is only for testing purpose.
+    try:
+        with Path("teams.json").open() as json_file:
+            return json.load(json_file)
+    except OSError as e:
+        print(e)
