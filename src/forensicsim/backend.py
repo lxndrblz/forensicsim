@@ -53,6 +53,14 @@ Additionally, it has a flag to filter for datastores, which are interesting for 
 """
 
 
+def decode_truncated_int(data: bytes) -> int:
+    if len(data) == 0:
+        raise ValueError("No data to decode")
+    result = 0
+    for i, b in enumerate(data):
+        result |= (b << (i * 8))
+    return result
+
 class FastIndexedDB:
     def __init__(self, leveldb_dir: os.PathLike):
         self._db = ccl_leveldb.RawLevelDb(leveldb_dir)
@@ -122,7 +130,7 @@ class FastIndexedDB:
                         (
                             objstore_id,
                             varint_raw,
-                        ) = ccl_chromium_indexeddb.custom_le_varint_from_bytes(
+                        ) = decode_truncated_int(
                             record.key[len(prefix_objectstore) :]
                         )
                     except TypeError:
@@ -192,7 +200,7 @@ class FastIndexedDB:
                             (
                                 _value_version,
                                 varint_raw,
-                            ) = ccl_chromium_indexeddb.custom_le_varint_from_bytes(
+                            ) = decode_truncated_int(
                                 record.value
                             )
                             val_idx = len(varint_raw)
@@ -205,7 +213,7 @@ class FastIndexedDB:
                             (
                                 _,
                                 varint_raw,
-                            ) = ccl_chromium_indexeddb.custom_le_varint_from_bytes(
+                            ) = decode_truncated_int(
                                 record.value[val_idx:]
                             )
 
