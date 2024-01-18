@@ -91,17 +91,17 @@ class FastIndexedDB:
         for db_id in global_metadata.db_ids:
             if db_id.dbid_no == None:
                 continue
+            # if db_id.dbid_no > 0x7f:
+            #     raise NotImplementedError("there could be this many dbs, but I don't support it yet")
+            #
+            # # Database keys end with 0
+            # prefix_database = bytes([0, db_id.dbid_no, 0, 0])
+            #
+            # # Objetstore keys end with 50
+            # prefix_objectstore = bytes([0, db_id.dbid_no, 0, 0, 50])
 
-            if db_id.dbid_no > 0x7F:
-                raise NotImplementedError(
-                    "there could be this many dbs, but I don't support it yet"
-                )
-
-            # Database keys end with 0
-            prefix_database = bytes([0, db_id.dbid_no, 0, 0])
-
-            # Objetstore keys end with 50
-            prefix_objectstore = bytes([0, db_id.dbid_no, 0, 0, 50])
+            prefix_database = IndexedDb.make_prefix(db_id.dbid_no, 0, 0)
+            prefix_objectstore = IndexedDb.make_prefix(db_id.dbid_no, 0, 0, [50])
 
             for record in reversed(self._fetched_records):
                 if (
