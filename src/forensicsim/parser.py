@@ -75,7 +75,7 @@ class Meeting(DataClassJsonMixin):
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Meeting):
             return NotImplemented
-        return self.cached_deduplication_key == other.cachedDeduplicationKey
+        return self.cached_deduplication_key == other.cached_deduplication_key
 
     def __hash__(self) -> int:
         return hash(self.cached_deduplication_key)
@@ -108,7 +108,7 @@ class Message(DataClassJsonMixin):
     is_from_me: Optional[bool] = None
     message_kind: Optional[str] = None
     messagetype: Optional[str] = None
-    originalarrivaltime: Optional[str] = None
+    original_arrival_time: Optional[str] = None
     properties: dict[str, Any] = field(
         default_factory=dict, metadata=config(decoder=decode_dict)
     )
@@ -129,6 +129,11 @@ class Message(DataClassJsonMixin):
             self.cached_deduplication_key = str(self.creator) + str(
                 self.clientmessageid
             )
+        # change record type depending on properties
+        if "call-log" in self.properties:
+            self.record_type = "call"
+        if "activity" in self.properties:
+            self.record_type = "reaction"
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Message):
@@ -193,7 +198,8 @@ def _parse_buddies(buddies: list[dict]) -> set[Contact]:
             parsed_buddies.add(Contact.from_dict(b_of_b))
     return parsed_buddies
 
-
+# Conversations can contain multiple artefacts
+# -> If type:Meeting then its a meeting
 def _parse_conversations(conversations: list[dict]) -> set[Meeting]:
     cleaned_conversations = set()
     for c in conversations:
@@ -211,6 +217,13 @@ def _parse_conversations(conversations: list[dict]) -> set[Meeting]:
 def _parse_reply_chains(reply_chains: list[dict]) -> set[Message]:
     cleaned_reply_chains = set()
     for rc in reply_chains:
+
+
+        # Skip empty records
+        if rc["value"] is None:
+            continue
+        
+        rc |= rc.get("value", {})
         rc |= {"origin_file": rc.get("origin_file")}
 
         message_dict = {}
@@ -226,27 +239,26 @@ def _parse_reply_chains(reply_chains: list[dict]) -> set[Message]:
             md = message_dict[k]
 
             if (
-                md.get("messageType", "") == "RichText/Html"
-                or md.get("messageType", "") == "Text"
+                md.get("messagetype", "") == "RichText/Html"
+                or md.get("messagetype", "") == "Text"
             ):
-                rc |= rc.get("value", {})
-                rc |= {"cached_deduplication_key": md.get("dedupeKey")}
-                rc |= {"clientmessageid": md.get("clientMessageId")}
-                rc |= {"composetime": md.get("clientArrivalTime")}
+                rc |= {"cached_deduplication_key": md.get("cachedDeduplicationKey")}
+                rc |= {"clientmessageid": md.get("clientmessageid")}
+                rc |= {"composetime": md.get("composetime")}
                 rc |= {"conversation_id": md.get("conversationId")}
                 rc |= {"content": md.get("content")}
-                rc |= {"contenttype": md.get("contentType")}
-                rc |= {"created_time": md.get("clientArrivalTime")}
-                rc |= {"creator": md.get("version")}
-                rc |= {"is_from_me": md.get("isSentByCurrentUser")}
-                rc |= {"messagetype": md.get("messageType")}
-                rc |= {"originalArrivalTime": md.get("version")}
+                rc |= {"contenttype": md.get("contenttype")}
+                rc |= {"created_time": md.get("createdTime")}
+                rc |= {"creator": md.get("creator")}
+                rc |= {"is_from_me": md.get("isFromMe")}
+                rc |= {"messagetype": md.get("messagetype")}
+                rc |= {"messageKind": md.get("messageKind")}
                 rc |= {"client_arrival_time": md.get("clientArrivalTime")}
-                rc |= {"original_arrival_time": md.get("clientArrivalTime")}
+                rc |= {"original_arrival_time": md.get("originalarrivaltime")}
                 rc |= {"version": md.get("version")}
                 rc |= {"properties": md.get("properties")}
 
-            cleaned_reply_chains.add(Message.from_dict(rc))
+                cleaned_reply_chains.add(Message.from_dict(rc))
 
     return cleaned_reply_chains
 
@@ -268,7 +280,7 @@ def parse_records(records: list[dict]) -> list[dict]:
     # sort within groups i.e., Contacts, Meetings, Conversations
     parsed_records = (
         sorted(_parse_people(people))
-        #    + sorted(_parse_buddies(buddies))
+        + sorted(_parse_buddies(buddies))
         + sorted(_parse_reply_chains(reply_chains))
         + sorted(_parse_conversations(conversations))
     )
