@@ -275,10 +275,13 @@ def parse_records(records: list[dict]) -> list[dict]:
     return [r.to_dict() for r in parsed_records]
 
 
-def process_db(input_path: Path, output_path: Path) -> None:
+def process_db(input_path: Path, output_path: Path, blob_path: Path=None, do_not_filter: bool = True) -> None:
     if not input_path.parts[-1].endswith(".leveldb"):
         raise ValueError(f"Expected a leveldb folder. Path: {input_path}")
 
-    extracted_values = parse_db(input_path)
+    if blob_path is not None and not blob_path.parts[-1].endswith(".blob"):
+        raise ValueError(f"Expected a .blob folder. Path: {blob_path}")
+
+    extracted_values = parse_db(input_path, blob_path, do_not_filter)
     parsed_records = parse_records(extracted_values)
     write_results_to_json(parsed_records, output_path)

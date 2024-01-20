@@ -46,10 +46,11 @@ Additionally, it has a flag to filter for datastores, which are interesting for 
 """
 
 
-def parse_db(filepath, do_not_filter=False):
+def parse_db(filepath : Path, blobpath: Path = None, do_not_filter: bool=False):
     # Open raw access to a LevelDB and deserialize the records.
-    wrapper = ccl_chromium_indexeddb.WrappedIndexDB(filepath)
 
+    wrapper = ccl_chromium_indexeddb.WrappedIndexDB(filepath, blobpath)
+    
     extracted_values = []
 
     for db_info in wrapper.database_ids:

@@ -26,17 +26,14 @@ from pathlib import Path
 
 import click
 
-from forensicsim.backend import parse_db, write_results_to_json
+from forensicsim.backend import write_results_to_json
+from forensicsim.parser import parse_db
 from forensicsim.consts import DUMP_HEADER
 
-
-def process_db(input_path, output_path):
-    # Do some basic error handling
-    if not input_path.parts[-1].endswith(".leveldb"):
-        raise ValueError(f"Expected a leveldb folder. Path: {input_path}")
+def process_level_db(input_path: Path, output_path: Path, blob_path: Path=None):
 
     # convert the database to a python list with nested dictionaries
-    extracted_values = parse_db(input_path, do_not_filter=True)
+    extracted_values = parse_db(input_path, blob_path, do_not_filter=True)
 
     # write the output to a json file
     write_results_to_json(extracted_values, output_path)
@@ -50,8 +47,9 @@ def process_db(input_path, output_path):
         exists=True, readable=True, writable=False, dir_okay=True, path_type=Path
     ),
     required=True,
-    help="File path to the IndexedDB.",
+    help="File path to the .leveldb folder of the IndexedDB.",
 )
+
 @click.option(
     "-o",
     "--outputpath",
@@ -59,9 +57,20 @@ def process_db(input_path, output_path):
     required=True,
     help="File path to the processed output.",
 )
-def process_cmd(filepath, outputpath):
+
+@click.option(
+    "-b",
+    "--blobpath",
+    type=click.Path(
+        exists=True, readable=True, writable=False, dir_okay=True, path_type=Path
+    ),
+    required=False,
+    help="File path to the .blob folder of the IndexedDB.",
+)
+
+def process_cmd(filepath: Path, outputpath: Path, blobpath: Path) -> None:
     click.echo(DUMP_HEADER)
-    process_db(filepath, outputpath)
+    process_level_db(filepath, outputpath, blobpath)
 
 
 if __name__ == "__main__":
