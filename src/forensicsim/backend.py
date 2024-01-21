@@ -24,7 +24,7 @@ SOFTWARE.
 
 import json
 from pathlib import Path
-from typing import Optional, List, Any
+from typing import Any, Optional
 
 from chromedb import (
     ccl_chromium_indexeddb,
@@ -51,7 +51,7 @@ def parse_db(
     filepath: Path,
     blobpath: Optional[Path] = None,
     do_not_filter: Optional[bool] = False,
-) -> List[dict[str, Any]]:
+) -> list[dict[str, Any]]:
     # Open raw access to a LevelDB and deserialize the records.
 
     wrapper = ccl_chromium_indexeddb.WrappedIndexDB(filepath, blobpath)
@@ -92,7 +92,7 @@ def parse_db(
     return extracted_values
 
 
-def parse_localstorage(filepath: Path) -> List[dict[str, Any]]:
+def parse_localstorage(filepath: Path) -> list[dict[str, Any]]:
     local_store = ccl_chromium_localstorage.LocalStoreDb(filepath)
     extracted_values = []
     for record in local_store.iter_all_records():
@@ -103,7 +103,7 @@ def parse_localstorage(filepath: Path) -> List[dict[str, Any]]:
     return extracted_values
 
 
-def parse_sessionstorage(filepath: Path) -> List[dict[str, Any]]:
+def parse_sessionstorage(filepath: Path) -> list[dict[str, Any]]:
     session_storage = ccl_chromium_sessionstorage.SessionStoreDb(filepath)
     extracted_values = []
     for host in session_storage:
@@ -124,7 +124,7 @@ def parse_sessionstorage(filepath: Path) -> List[dict[str, Any]]:
     return extracted_values
 
 
-def write_results_to_json(data: List[dict[str, Any]], outputpath: Path) -> None:
+def write_results_to_json(data: list[dict[str, Any]], outputpath: Path) -> None:
     # Dump messages into a json file
     try:
         with open(outputpath, "w", encoding="utf-8") as f:
