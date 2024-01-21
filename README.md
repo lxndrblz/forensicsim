@@ -61,31 +61,12 @@ Feel free to use the LevelDB files provided in this repository.
 The parser has the following options:
 
 ```text
- _____                        _            _
-|  ___|__  _ __ ___ _ __  ___(_) ___ ___  (_)_ __ ___
-| |_ / _ \| '__/ _ \ '_ \/ __| |/ __/ __| | | '_ ` _ \
-|  _| (_) | | |  __/ | | \__ \ | (__\__ \_| | | | | | |
-|_|  \___/|_|  \___|_| |_|___/_|\___|___(_)_|_| |_| |_|
-
-__  ___                  _     _____           _
-\ \/ / |_ _ __ __ _  ___| |_  |_   _|__   ___ | |
- \  /| __| '__/ _` |/ __| __|   | |/ _ \ / _ \| |
- /  \| |_| | | (_| | (__| |_    | | (_) | (_) | |
-/_/\_\\__|_|  \__,_|\___|\__|   |_|\___/ \___/|_|
-
-
-usage: ms_teams_parser.exe [-h] -f FILEPATH -o OUTPUTPATH
-
-Forensics.im Xtract Tool
-
-optional arguments:
-  -h, --help            show this help message and exit
-
-required arguments:
-  -f FILEPATH, --filepath FILEPATH
-                        File path to the IndexedDB.
-  -o OUTPUTPATH, --outputpath OUTPUTPATH
-                        File path to the processed output.
+Options:
+  -f, --filepath PATH    File path to the .leveldb folder of the IndexedDB.
+                         [required]
+  -o, --outputpath PATH  File path to the processed output.  [required]
+  -b, --blobpath PATH    File path to the .blob folder of the IndexedDB.
+  --help                 Show this message and exit.
 ```
 
 ---
@@ -106,19 +87,6 @@ pyinstaller "main.spec"
 This script allows dumping a *Microsoft Teams LevelDB* to a json file, without processing it further. The usage is
 as following. Simply specify the path to the database and where you want to output the JSON file.
 ```text
- _____                        _            _
-|  ___|__  _ __ ___ _ __  ___(_) ___ ___  (_)_ __ ___
-| |_ / _ \| '__/ _ \ '_ \/ __| |/ __/ __| | | '_ ` _ \
-|  _| (_) | | |  __/ | | \__ \ | (__\__ \_| | | | | | |
-|_|  \___/|_|  \___|_| |_|___/_|\___|___(_)_|_| |_| |_|
-
- ____                          _____           _
-|  _ \ _   _ _ __ ___  _ __   |_   _|__   ___ | |
-| | | | | | | '_ ` _ \| '_ \    | |/ _ \ / _ \| |
-| |_| | |_| | | | | | | |_) |   | | (_) | (_) | |
-|____/ \__,_|_| |_| |_| .__/    |_|\___/ \___/|_|
-                      |_|
-
 usage: dump_leveldb.py [-h] -f FILEPATH -o OUTPUTPATH
 dump_leveldb.py: error: the following arguments are required: -f/--filepath, -o/--outputpath
 ```
@@ -147,6 +115,7 @@ tools\populate_teams.py -a 0 -f conversation.json
 This repository comes with two datasets that allow reproducing the findings of this work. The `testdata` folder contains the *LevelDB* databases that have been extracted from two test clients. These can be used for benchmarking without having to perform a (lengthy) data population.
 
 The `populationdata` contains *JSON* files of the communication that has been populated into the testing environment. These can be used to reproduce the experiment from scratch. However, for a rerun, it will be essential to adjust the dates to future dates, as the populator script relies on sufficient breaks between the individual messages.
+
 ---
 
 # Acknowledgements & Thanks
