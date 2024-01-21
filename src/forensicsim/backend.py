@@ -24,7 +24,7 @@ SOFTWARE.
 
 import json
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Any
 
 from chromedb import (
     ccl_chromium_indexeddb,
@@ -51,7 +51,7 @@ def parse_db(
     filepath: Path,
     blobpath: Optional[Path] = None,
     do_not_filter: Optional[bool] = False,
-):
+) -> List[dict[str, Any]]:
     # Open raw access to a LevelDB and deserialize the records.
 
     wrapper = ccl_chromium_indexeddb.WrappedIndexDB(filepath, blobpath)
@@ -92,7 +92,7 @@ def parse_db(
     return extracted_values
 
 
-def parse_localstorage(filepath):
+def parse_localstorage(filepath: Path) -> List[dict[str, Any]]:
     local_store = ccl_chromium_localstorage.LocalStoreDb(filepath)
     extracted_values = []
     for record in local_store.iter_all_records():
@@ -103,7 +103,7 @@ def parse_localstorage(filepath):
     return extracted_values
 
 
-def parse_sessionstorage(filepath):
+def parse_sessionstorage(filepath: Path) -> List[dict[str, Any]]:
     session_storage = ccl_chromium_sessionstorage.SessionStoreDb(filepath)
     extracted_values = []
     for host in session_storage:
@@ -124,21 +124,12 @@ def parse_sessionstorage(filepath):
     return extracted_values
 
 
-def write_results_to_json(data, outputpath):
+def write_results_to_json(data: List[dict[str, Any]], outputpath: Path) -> None:
     # Dump messages into a json file
     try:
         with open(outputpath, "w", encoding="utf-8") as f:
             json.dump(
                 data, f, indent=4, sort_keys=True, default=str, ensure_ascii=False
             )
-    except OSError as e:
-        print(e)
-
-
-def parse_json():
-    # read data from a file. This is only for testing purpose.
-    try:
-        with Path("teams.json").open() as json_file:
-            return json.load(json_file)
     except OSError as e:
         print(e)
