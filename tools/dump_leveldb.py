@@ -23,15 +23,18 @@ SOFTWARE.
 """
 
 from pathlib import Path
+from typing import Optional
 
 import click
 
 from forensicsim.backend import write_results_to_json
-from forensicsim.parser import parse_db
 from forensicsim.consts import DUMP_HEADER
+from forensicsim.parser import parse_db
 
-def process_level_db(input_path: Path, output_path: Path, blob_path: Path=None):
 
+def process_level_db(
+    input_path: Path, output_path: Path, blob_path: Optional[Path] = None
+) -> None:
     # convert the database to a python list with nested dictionaries
     extracted_values = parse_db(input_path, blob_path, do_not_filter=True)
 
@@ -49,7 +52,6 @@ def process_level_db(input_path: Path, output_path: Path, blob_path: Path=None):
     required=True,
     help="File path to the .leveldb folder of the IndexedDB.",
 )
-
 @click.option(
     "-o",
     "--outputpath",
@@ -57,7 +59,6 @@ def process_level_db(input_path: Path, output_path: Path, blob_path: Path=None):
     required=True,
     help="File path to the processed output.",
 )
-
 @click.option(
     "-b",
     "--blobpath",
@@ -67,8 +68,9 @@ def process_level_db(input_path: Path, output_path: Path, blob_path: Path=None):
     required=False,
     help="File path to the .blob folder of the IndexedDB.",
 )
-
-def process_cmd(filepath: Path, outputpath: Path, blobpath: Path) -> None:
+def process_cmd(
+    filepath: Path, outputpath: Path, blobpath: Optional[Path] = None
+) -> None:
     click.echo(DUMP_HEADER)
     process_level_db(filepath, outputpath, blobpath)
 

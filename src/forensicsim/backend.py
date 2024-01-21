@@ -24,6 +24,7 @@ SOFTWARE.
 
 import json
 from pathlib import Path
+from typing import Optional
 
 from chromedb import (
     ccl_chromium_indexeddb,
@@ -46,11 +47,15 @@ Additionally, it has a flag to filter for datastores, which are interesting for 
 """
 
 
-def parse_db(filepath : Path, blobpath: Path = None, do_not_filter: bool=False):
+def parse_db(
+    filepath: Path,
+    blobpath: Optional[Path] = None,
+    do_not_filter: Optional[bool] = False,
+):
     # Open raw access to a LevelDB and deserialize the records.
 
     wrapper = ccl_chromium_indexeddb.WrappedIndexDB(filepath, blobpath)
-    
+
     extracted_values = []
 
     for db_info in wrapper.database_ids:

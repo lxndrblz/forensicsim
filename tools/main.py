@@ -26,9 +26,9 @@ from pathlib import Path
 
 import click
 
-from forensicsim.backend import parse_db, write_results_to_json
 from forensicsim.consts import XTRACT_HEADER
 from forensicsim.parser import process_db
+
 
 @click.command()
 @click.option(
@@ -40,7 +40,6 @@ from forensicsim.parser import process_db
     required=True,
     help="File path to the .leveldb folder of the IndexedDB.",
 )
-
 @click.option(
     "-o",
     "--outputpath",
@@ -48,7 +47,6 @@ from forensicsim.parser import process_db
     required=True,
     help="File path to the processed output.",
 )
-
 @click.option(
     "-b",
     "--blobpath",
@@ -58,7 +56,6 @@ from forensicsim.parser import process_db
     required=False,
     help="File path to the .blob folder of the IndexedDB.",
 )
-
 def process_cmd(filepath: Path, outputpath: Path, blobpath: Path) -> None:
     click.echo(XTRACT_HEADER)
     process_db(filepath, outputpath, blobpath, True)
