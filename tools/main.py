@@ -26,18 +26,8 @@ from pathlib import Path
 
 import click
 
-from forensicsim.backend import parse_db, write_results_to_json
 from forensicsim.consts import XTRACT_HEADER
-from forensicsim.parser import parse_records
-
-
-def process_db(input_path: Path, output_path: Path):
-    if not input_path.parts[-1].endswith(".leveldb"):
-        raise ValueError(f"Expected a leveldb folder. Path: {input_path}")
-
-    extracted_values = parse_db(input_path)
-    parsed_records = parse_records(extracted_values)
-    write_results_to_json(parsed_records, output_path)
+from forensicsim.parser import process_db
 
 
 @click.command()
@@ -48,7 +38,7 @@ def process_db(input_path: Path, output_path: Path):
         exists=True, readable=True, writable=False, dir_okay=True, path_type=Path
     ),
     required=True,
-    help="File path to the IndexedDB.",
+    help="File path to the .leveldb folder of the IndexedDB.",
 )
 @click.option(
     "-o",
@@ -57,9 +47,18 @@ def process_db(input_path: Path, output_path: Path):
     required=True,
     help="File path to the processed output.",
 )
-def process_cmd(filepath, outputpath):
+@click.option(
+    "-b",
+    "--blobpath",
+    type=click.Path(
+        exists=True, readable=True, writable=False, dir_okay=True, path_type=Path
+    ),
+    required=False,
+    help="File path to the .blob folder of the IndexedDB.",
+)
+def process_cmd(filepath: Path, outputpath: Path, blobpath: Path) -> None:
     click.echo(XTRACT_HEADER)
-    process_db(filepath, outputpath)
+    process_db(filepath, outputpath, blobpath, True)
 
 
 if __name__ == "__main__":

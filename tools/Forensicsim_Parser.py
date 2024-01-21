@@ -88,7 +88,7 @@ DIRECTORIES = [
 # Factory that defines the name and details of the module and allows Autopsy
 # to create instances of the modules that will do the analysis.
 class ForensicIMIngestModuleFactory(IngestModuleFactoryAdapter):
-    def __init__(self):
+    def __init__(self) -> None:
         self.settings = None
 
     moduleName = "Microsoft Teams Parser"
