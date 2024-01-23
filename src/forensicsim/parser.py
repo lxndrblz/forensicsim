@@ -184,7 +184,11 @@ def _parse_people(people: list[dict], version: str) -> set[Contact]:
 
     for p in people:
         # Skip empty records / records w/o mri
-        if p.get("value") is not None and p.get("mri") is not None and version in ("v1", "v2"):
+        if (
+            p.get("value") is not None
+            and p.get("mri") is not None
+            and version in ("v1", "v2")
+        ):
             p |= p.get("value", {})
             p |= {"origin_file": p.get("origin_file")}
             parsed_people.add(Contact.from_dict(p))
@@ -213,7 +217,7 @@ def _parse_buddies(buddies: list[dict], version: str) -> set[Contact]:
 def _parse_conversations(conversations: list[dict], version: str) -> set[Meeting]:
     cleaned_conversations = set()
     for c in conversations:
-        if c.get("value") is not None and version in ("v1","v2"):
+        if c.get("value") is not None and version in ("v1", "v2"):
             if c.get("value", {}).get("type", "") == "Meeting" and "meeting" in c.get(
                 "value", {}
             ).get("threadProperties", {}):
