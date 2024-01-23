@@ -190,8 +190,11 @@ def _parse_people(people: list[dict], version: str) -> set[Contact]:
             and version in ("v1", "v2")
         ):
             p |= p.get("value", {})
-            p |= {"origin_file": p.get("origin_file")}
-            parsed_people.add(Contact.from_dict(p))
+            p |= {"display_name": p.get("displayName")}
+            p |= {"user_principal_name": p.get("userPrincipalName")}
+            parsed_people.add(Contact.schema().load())
+        else:
+            print("Teams Version is unknown. Can not extract records of type people.")
     return parsed_people
 
 
@@ -205,7 +208,6 @@ def _parse_buddies(buddies: list[dict], version: str) -> set[Contact]:
         if b_value and version in ("v1", "v2"):
             buddies_of_b = b_value.get("buddies", [])
             for b_of_b in buddies_of_b:
-                b_of_b |= {"origin_file": b.get("origin_file")}
                 parsed_buddies.add(Contact.from_dict(b_of_b))
         else:
             print("Teams Version is unknown. Can not extract records of type buddies.")
