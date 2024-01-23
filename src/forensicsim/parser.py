@@ -192,7 +192,7 @@ def _parse_people(people: list[dict], version: str) -> set[Contact]:
             p |= p.get("value", {})
             p |= {"display_name": p.get("displayName")}
             p |= {"user_principal_name": p.get("userPrincipalName")}
-            parsed_people.add(Contact.schema().load())
+            parsed_people.add(Contact.from_dict(p))
         else:
             print("Teams Version is unknown. Can not extract records of type people.")
     return parsed_people
