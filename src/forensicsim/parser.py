@@ -183,27 +183,11 @@ def _parse_people(people: list[dict], version: str) -> set[Contact]:
     parsed_people = set()
 
     for p in people:
-        # Skip empty records
-        if p["value"] is None:
-            continue
-
-        # Fetch relevant data
-        p |= p.get("value", {})
-        p |= {"origin_file": p.get("origin_file")}
-
-        # Skip contacts without an MRI
-        if p.get("mri") is None:
-            continue
-
-        if version == "v1" or version == "v2":
-            p |= {"display_name": p.get("displayName")}
-            p |= {"email": p.get("email")}
-            p |= {"mri": p.get("mri")}
-            p |= {"user_principal_name": p.get("userPrincipalName")}
-        else:
-            print("Teams Version is unknown. Can not extract records of type people.")
-
-        parsed_people.add(Contact.from_dict(p))
+        # Skip empty records / records w/o mri
+        if p.get("value") is not None and p.get("mri") is not None and version in ("v1", "v2"):
+            p |= p.get("value", {})
+            p |= {"origin_file": p.get("origin_file")}
+            parsed_people.add(Contact.from_dict(p))
     return parsed_people
 
 
@@ -212,11 +196,10 @@ def _parse_buddies(buddies: list[dict], version: str) -> set[Contact]:
 
     for b in buddies:
         # Skip empty records
-        if b["value"] is None:
-            continue
+        b_value = b.get("value", {})
         # Fetch relevant data
-        if version == "v1" or version == "v2":
-            buddies_of_b = b.get("value", {}).get("buddies", [])
+        if b_value and version in ("v1", "v2"):
+            buddies_of_b = b_value.get("buddies", [])
             for b_of_b in buddies_of_b:
                 b_of_b |= {"origin_file": b.get("origin_file")}
                 parsed_buddies.add(Contact.from_dict(b_of_b))
@@ -230,11 +213,7 @@ def _parse_buddies(buddies: list[dict], version: str) -> set[Contact]:
 def _parse_conversations(conversations: list[dict], version: str) -> set[Meeting]:
     cleaned_conversations = set()
     for c in conversations:
-        # Skip empty records
-        if c["value"] is None:
-            continue
-        # Fetch relevant data
-        if version == "v1" or version == "v2":
+        if c.get("value") is not None and version in ("v1","v2"):
             if c.get("value", {}).get("type", "") == "Meeting" and "meeting" in c.get(
                 "value", {}
             ).get("threadProperties", {}):
