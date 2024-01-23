@@ -190,9 +190,7 @@ def _parse_people(people: list[dict], version: str) -> set[Contact]:
             and version in ("v1", "v2")
         ):
             p |= p.get("value", {})
-            p |= {"display_name": p.get("displayName")}
-            p |= {"user_principal_name": p.get("userPrincipalName")}
-            parsed_people.add(Contact.from_dict(p))
+            parsed_people.add(Contact.from_json(json.dumps(p)))
         else:
             print("Teams Version is unknown. Can not extract records of type people.")
     return parsed_people
@@ -208,7 +206,7 @@ def _parse_buddies(buddies: list[dict], version: str) -> set[Contact]:
         if b_value and version in ("v1", "v2"):
             buddies_of_b = b_value.get("buddies", [])
             for b_of_b in buddies_of_b:
-                parsed_buddies.add(Contact.from_dict(b_of_b))
+                parsed_buddies.add(Contact.from_json(json.dumps(b_of_b)))
         else:
             print("Teams Version is unknown. Can not extract records of type buddies.")
     return parsed_buddies
@@ -223,11 +221,9 @@ def _parse_conversations(conversations: list[dict], version: str) -> set[Meeting
             if c.get("value", {}).get("type", "") == "Meeting" and "meeting" in c.get(
                 "value", {}
             ).get("threadProperties", {}):
-                c_value = c.get("value", {})
-                c |= c_value
-                c |= {"thread_properties": c_value.get("threadProperties", {})}
+                c |= c.get("value", {})
                 c |= {"cached_deduplication_key": c.get("id")}
-                cleaned_conversations.add(Meeting.from_dict(c))
+                cleaned_conversations.add(Meeting.from_json(json.dumps(c)))
         else:
             print("Teams Version is unknown. Can not extract records of type meeting.")
     return cleaned_conversations
