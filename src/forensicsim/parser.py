@@ -191,7 +191,6 @@ def _parse_people(people: list[dict], version: str) -> set[Contact]:
             and p_value.get("mri") is not None
             and version in ("v1", "v2")
         ):
-            
             parsed_people.add(Contact.from_dict(p | p.get("value", {})))
         else:
             logging.warning(
