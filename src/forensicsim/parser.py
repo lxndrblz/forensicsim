@@ -185,15 +185,17 @@ def _parse_people(people: list[dict], version: str) -> set[Contact]:
 
     for p in people:
         # Skip empty records / records w/o mri
+        p_value = p.get("value")
         if (
-            p.get("value") is not None
-            and p.get("mri") is not None
+            p_value is not None
+            and p_value.get("mri") is not None
             and version in ("v1", "v2")
         ):
+            
             parsed_people.add(Contact.from_dict(p | p.get("value", {})))
         else:
             logging.warning(
-                "Teams Version is unknown. Can not extract records of type people."
+                "Teams Version is unknown or record incomplete. Can not extract records of type people."
             )
     return parsed_people
 
