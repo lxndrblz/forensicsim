@@ -1,4 +1,5 @@
 import json
+import logging
 import warnings
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -189,10 +190,11 @@ def _parse_people(people: list[dict], version: str) -> set[Contact]:
             and p.get("mri") is not None
             and version in ("v1", "v2")
         ):
-            p |= p.get("value", {})
-            parsed_people.add(Contact.from_json(json.dumps(p)))
+            parsed_people.add(Contact.from_dict(p | p.get("value", {})))
         else:
-            print("Teams Version is unknown. Can not extract records of type people.")
+            logging.warning(
+                "Teams Version is unknown. Can not extract records of type people."
+            )
     return parsed_people
 
 
@@ -200,77 +202,67 @@ def _parse_buddies(buddies: list[dict], version: str) -> set[Contact]:
     parsed_buddies = set()
 
     for b in buddies:
-        # Skip empty records
         b_value = b.get("value", {})
-        # Fetch relevant data
         if b_value and version in ("v1", "v2"):
             buddies_of_b = b_value.get("buddies", [])
             for b_of_b in buddies_of_b:
-                parsed_buddies.add(Contact.from_json(json.dumps(b_of_b)))
+                parsed_buddies.add(Contact.from_dict(b_of_b))
         else:
-            print("Teams Version is unknown. Can not extract records of type buddies.")
+            logging.warning(
+                "Teams Version is unknown. Can not extract records of type buddies."
+            )
     return parsed_buddies
 
 
-# Conversations can contain multiple artefacts
-# -> If type:Meeting then its a meeting
 def _parse_conversations(conversations: list[dict], version: str) -> set[Meeting]:
     cleaned_conversations = set()
+
     for c in conversations:
-        if c.get("value") is not None and version in ("v1", "v2"):
-            if c.get("value", {}).get("type", "") == "Meeting" and "meeting" in c.get(
-                "value", {}
-            ).get("threadProperties", {}):
-                c |= c.get("value", {})
-                c |= {"cached_deduplication_key": c.get("id")}
-                cleaned_conversations.add(Meeting.from_json(json.dumps(c)))
+        value = c.get("value", {})
+        thread_properties = value.get("threadProperties", {})
+        # Conversations can contain multiple artefacts. Filter only for meetings.
+        if version in ("v1", "v2") and "meeting" in thread_properties:
+            c |= value
+            c |= {"cached_deduplication_key": c.get("id")}
+            cleaned_conversations.add(Meeting.from_dict(c))
         else:
-            print("Teams Version is unknown. Can not extract records of type meeting.")
+            logging.warning(
+                "Teams Version is unknown. Can not extract records of type meeting."
+            )
     return cleaned_conversations
 
 
 def _parse_reply_chains(reply_chains: list[dict], version: str) -> set[Message]:
     cleaned_reply_chains = set()
+
     for rc in reply_chains:
+        rc_value = rc.get("value", {})
+
         # Skip empty records
-        if rc["value"] is None:
+        if not rc_value:
             continue
 
         # Fetch relevant data
-        rc |= rc.get("value", {})
-        rc |= {"origin_file": rc.get("origin_file")}
-
+        rc |= rc_value
         message_dict = {}
         if version == "v1":
-            message_dict = rc.get("value", {}).get("messages", {})
+            message_dict = rc_value.get("messages", {})
         elif version == "v2":
-            message_dict = rc.get("value", {}).get("messageMap", {})
+            message_dict = rc_value.get("messageMap", {})
         else:
-            print(
+            logging.warning(
                 "Teams Version is unknown. Can not extract records of type reply_chains."
             )
             continue
 
         for k in message_dict:
             md = message_dict[k]
-            if (
-                md.get("messagetype", "") == "RichText/Html"
-                or md.get("messagetype", "") == "Text"
-                or md.get("messageType", "") == "RichText/Html"
-                or md.get("messageType", "") == "Text"
-            ):
-                if version == "v1":
-                    rc |= {"cached_deduplication_key": md.get("cachedDeduplicationKey")}
-                    rc |= {"clientmessageid": md.get("clientmessageid")}
-                    rc |= {"composetime": md.get("composetime")}
-                    rc |= {"contenttype": md.get("contenttype")}
-                    rc |= {"created_time": md.get("createdTime")}
-                    rc |= {"is_from_me": md.get("isFromMe")}
-                    rc |= {"messagetype": md.get("messagetype")}
-                    rc |= {"messageKind": md.get("messageKind")}
-                    rc |= {"original_arrival_time": md.get("originalarrivaltime")}
-
-                elif version == "v2":
+            if md.get("messagetype", "") in ("RichText/Html", "Text") or md.get(
+                "messageType"
+            ) in ("RichText/Html", "Text"):
+                rc |= md
+                # map to teams 1.x keys
+                if version == "v2":
                     rc |= {"cached_deduplication_key": md.get("dedupeKey")}
                     rc |= {"clientmessageid": md.get("clientMessageId")}
                     # set to clientArrivalTime as compose Time is no longer present
@@ -280,15 +272,6 @@ def _parse_reply_chains(reply_chains: list[dict], version: str) -> set[Message]:
                     rc |= {"created_time": md.get("clientArrivalTime")}
                     rc |= {"is_from_me": md.get("isSentByCurrentUser")}
                     rc |= {"messagetype": md.get("messageType")}
-                    rc |= {"original_arrival_time": md.get("originalArrivalTime")}
-
-                # Similar across versions
-                rc |= {"creator": md.get("creator")}
-                rc |= {"conversation_id": md.get("conversationId")}
-                rc |= {"content": md.get("content")}
-                rc |= {"client_arrival_time": md.get("clientArrivalTime")}
-                rc |= {"version": md.get("version")}
-                rc |= {"properties": md.get("properties")}
 
                 cleaned_reply_chains.add(Message.from_dict(rc))
 
