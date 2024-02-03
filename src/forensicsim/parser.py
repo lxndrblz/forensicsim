@@ -261,6 +261,8 @@ def _parse_reply_chains(reply_chains: list[dict], version: str) -> set[Message]:
                 "messageType"
             ) in ("RichText/Html", "Text"):
                 rc |= md
+                if version == "v1":
+                    rc |= {"original_arrival_time": md.get("originalarrivaltime")}
                 # map to teams 1.x keys
                 if version == "v2":
                     rc |= {"cached_deduplication_key": md.get("dedupeKey")}
