@@ -30,7 +30,9 @@ def decode_dict(properties: Union[bytes, str, dict]) -> dict[str, Any]:
     try:
         if isinstance(properties, bytes):
             soup = BeautifulSoup(properties, features="html.parser")
-            properties = properties.decode(encoding=soup.original_encoding, errors='ignore')
+            properties = properties.decode(
+                encoding=soup.original_encoding, errors="ignore"
+            )
         if isinstance(properties, dict):
             # handle case where nested childs are dicts or list but provided with "" but have to be expanded.
             for key, value in properties.items():
