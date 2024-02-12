@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional, Union
+from json import JSONDecodeError
 
 from bs4 import BeautifulSoup, MarkupResemblesLocatorWarning
 from dataclasses_json import (
@@ -26,15 +27,20 @@ def strip_html_tags(value: str) -> str:
 
 
 def decode_dict(properties: Union[bytes, str, dict]) -> dict[str, Any]:
-    if isinstance(properties, bytes):
-        soup = BeautifulSoup(properties, features="html.parser")
-        properties = properties.decode(soup.original_encoding)
-    if isinstance(properties, dict):
-        # handle case where nested childs are dicts or list but provided with "" but have to be expanded.
-        for key, value in properties.items():
-            if isinstance(value, str) and value.startswith(("[", "{")):
-                properties[key] = json.loads(value, strict=False)
-        return properties
+    try:
+        if isinstance(properties, bytes):
+            soup = BeautifulSoup(properties, features="html.parser")
+            properties = properties.decode(encoding=soup.original_encoding, errors='ignore')
+        if isinstance(properties, dict):
+            # handle case where nested childs are dicts or list but provided with "" but have to be expanded.
+            for key, value in properties.items():
+                if isinstance(value, str) and value.startswith(("[", "{")):
+                    properties[key] = json.loads(value, strict=False)
+            return properties
+    except JSONDecodeError as e:
+        print(e)
+        print("Couldn't decode dictionary ", properties)
+        return {}
 
     return json.loads(properties, strict=False)
 
@@ -292,7 +298,7 @@ def _parse_reply_chains(reply_chains: list[dict], version: str) -> set[Message]:
                 elif version == "v2":
                     rc |= {"cached_deduplication_key": md.get("dedupeKey")}
                     rc |= {"clientmessageid": md.get("clientMessageId")}
-                    # set to clientArrivalTime as compose Time is no longer present
+                    # set to clientArrivalTime as compose time is no longer present
                     rc |= {"composetime": md.get("clientArrivalTime")}
                     rc |= {"contenttype": md.get("contentType")}
                     # set to clientArrivalTime as created time is no longer present
