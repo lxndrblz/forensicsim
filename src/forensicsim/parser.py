@@ -2,9 +2,9 @@ import json
 import warnings
 from dataclasses import dataclass, field
 from datetime import datetime
+from json import JSONDecodeError
 from pathlib import Path
 from typing import Any, Optional, Union
-from json import JSONDecodeError
 
 from bs4 import BeautifulSoup, MarkupResemblesLocatorWarning
 from dataclasses_json import (
