@@ -26,10 +26,11 @@
 # SOFTWARE.
 
 # Parses LevelDb's of Electron-based Microsoft Teams Desktop Client
-# May 2021
+# June 2024
 #
 # Comments
 #   Version 1.0 - Initial version - May 2021
+#   Version 1.1 - Updated vsion - June 2024
 #
 
 import calendar
@@ -79,11 +80,10 @@ ARTIFACT_PREFIX = "Microsoft Teams"
 # https_teams.microsoft.com_0.indexeddb.leveldb is for business and educational accounts
 # https_teams.live.com_0.indexeddb.leveldb is for private organisations
 
-DIRECTORIES = [
+LEVELDB_DIRECTORIES = [
     "https_teams.microsoft.com_0.indexeddb.leveldb",
     "https_teams.live.com_0.indexeddb.leveldb",
 ]
-
 
 # Factory that defines the name and details of the module and allows Autopsy
 # to create instances of the modules that will do the analysis.
@@ -195,7 +195,7 @@ class ForensicIMIngestModule(DataSourceIngestModule):
             blackboard,
         )
 
-    def _parse_databases(self, content, progress_bar):
+    def _create_temporary_directory(self, content):
         # Create a temporary directory this directory will be used for temporarily storing the artefacts
         try:
             parent_path = content.getParentPath()
@@ -212,16 +212,13 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                 Level.INFO,
                 "Created temporary directory: {}.".format(temp_path_to_content),
             )
+            return temp_path_to_content
         except OSError:
             raise IngestModuleException(
                 "Could not create directory: {}.".format(temp_path_to_content)
             )
 
-        # At first extract the desired artefacts to our newly created temp directory
-        self._extract(content, temp_path_to_content)
-
-        # Finally we can parse the extracted artefacts
-        self._analyze(content, temp_path_to_content, progress_bar)
+        
 
     def _extract(self, content, path):
         # This functions extracts the artefacts from the datasource
@@ -249,7 +246,7 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                 "Could not extract files to directory: {}.".format(path)
             )
 
-    def _analyze(self, content, path, progress_bar):
+    def _analyze(self, content, path, progress_bar, blob_path = None):
         # Piece together our command for running parse.exe with the appropriate parameters
         path_to_teams_json = os.path.join(path, "teams.json")
         self.log(
@@ -262,6 +259,10 @@ class ForensicIMIngestModule(DataSourceIngestModule):
         cmd.add(self.path_to_executable)
         cmd.add("--filepath")
         cmd.add(path)
+        # blob directories can be provided optionally
+        if blob_path is not None:
+            cmd.add("--blobpath")
+            cmd.add(blob_path)
         cmd.add("--outputpath")
         cmd.add(path_to_teams_json)
         process_builder = ProcessBuilder(cmd)
@@ -709,7 +710,7 @@ class ForensicIMIngestModule(DataSourceIngestModule):
         call_direction = CommunicationDirection.UNKNOWN
         if direction is not None:
             if direction == "incoming":
-                call_direction = CommunicationDirection.INCOMING
+                all_direction = CommunicationDirection.INCOMING
             elif direction == "outgoing":
                 call_direction = CommunicationDirection.OUTGOING
         return call_direction
@@ -756,22 +757,25 @@ class ForensicIMIngestModule(DataSourceIngestModule):
 
         # Locate the leveldb database. The full path on Windows systems is something like
         # C:\Users\<user>\AppData\Roaming\Microsoft\Teams\IndexedDB\https_teams.microsoft.com_0.indexeddb.leveldb
+        # We are also interested in the .blob folder as later version contain various data within these
 
         file_manager = Case.getCurrentCase().getServices().getFileManager()
 
         # There could be both personal and organisational clients on the matchine
-        for directory in DIRECTORIES:
+        for directory in LEVELDB_DIRECTORIES:
+            
             all_ms_teams_leveldbs = file_manager.findFiles(data_source, directory)
 
-            # Loop over all the files. On a multi user account these could be multiple one.
-            directories_to_process = len(all_ms_teams_leveldbs)
+            # Get the number of directories
+            no_directories_to_process = len(all_ms_teams_leveldbs)
 
             self.log(
                 Level.INFO,
-                "Found {} {} directories to process.".format(directories_to_process, directory),
+                "Found {} {} directories to process.".format(no_directories_to_process, directory),
             )
 
-            for i, content in enumerate(all_ms_teams_leveldbs):
+            # Loop over all the files. On a multi user account these could be multiple one.
+            for i, ms_teams_database in enumerate(all_ms_teams_leveldbs):
                 # Check if the user pressed cancel while we are processing the files
                 if self.context.isJobCancelled():
                     message = IngestMessage.createMessage(
@@ -781,18 +785,27 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                     )
                     IngestServices.getInstance().postMessage(message)
                     return IngestModule.ProcessResult.OK
+                
                 # Update progress both to the progress bar and log which file is currently processed
                 self.log(
                     Level.INFO,
                     "Processing item {} of {}: {}".format(
-                        i, directories_to_process, content.getName()
+                        i, no_directories_to_process, ms_teams_database.getName()
                     ),
                 )
-                # Ignore false positives
-                if not content.isDir():
+
+                # Ignore files with the same file name
+                if not ms_teams_database.isDir():
                     continue
-                # Where the REAL extraction and analysis happens
-                self._parse_databases(content, progress_bar)
+                
+                # Create temporary directory within Autopsy
+                temp_path_to_content = self._create_temporary_directory(ms_teams_database)
+
+                # Extract the desired artefacts to our newly created temp directory
+                self._extract(ms_teams_database, temp_path_to_content)
+
+                # Finally we can parse the extracted artefacts
+                self._analyze(ms_teams_database, temp_path_to_content, progress_bar)
 
         # Once we are done, post a message to the ingest messages box
         # Message type DATA seems most appropriate
