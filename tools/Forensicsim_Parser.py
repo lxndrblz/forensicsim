@@ -210,11 +210,11 @@ class ForensicIMIngestModule(DataSourceIngestModule):
             os.makedirs(temp_path_to_content)
             self.log(
                 Level.INFO,
-                f"Created temporary directory: {temp_path_to_content}.",
+                "Created temporary directory: {}.".format(temp_path_to_content),
             )
         except OSError:
             raise IngestModuleException(
-                f"Could not create directory: {temp_path_to_content}."
+                "Could not create directory: {}.".format(temp_path_to_content)
             )
 
         # At first extract the desired artefacts to our newly created temp directory
@@ -243,10 +243,10 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                 elif child.isDir():
                     os.mkdir(child_path)
                     self._extract(child, child_path)
-            self.log(Level.INFO, f"Successfully extracted to {path}")
+            self.log(Level.INFO, "Successfully extracted to {}".format(path))
         except OSError:
             raise IngestModuleException(
-                f"Could not extract files to directory: {path}."
+                "Could not extract files to directory: {}.".format(path)
             )
 
     def _analyze(self, content, path, progress_bar):
@@ -692,7 +692,7 @@ class ForensicIMIngestModule(DataSourceIngestModule):
         dir_name = os.path.join(content.getParentPath(), content.getName())
         results = file_manager.findFiles(data_source, filename, dir_name)
         if results.isEmpty():
-            self.log(Level.INFO, f"Unable to locate {filename}")
+            self.log(Level.INFO, "Unable to locate {}".format(filename))
             return None
         return results.get(
             0
@@ -768,7 +768,7 @@ class ForensicIMIngestModule(DataSourceIngestModule):
 
             self.log(
                 Level.INFO,
-                f"Found {directories_to_process} {directory} directories to process.",
+                "Found {} {} directories to process.".format(directories_to_process, directory),
             )
 
             for i, content in enumerate(all_ms_teams_leveldbs):
