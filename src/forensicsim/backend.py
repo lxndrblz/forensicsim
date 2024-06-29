@@ -58,12 +58,12 @@ def parse_db(
 
     extracted_values = []
 
-    for db_info in wrapper.database_ids:
+    for db_id in wrapper.database_ids:
         # Skip databases without a valid dbid_no
-        if db_info.dbid_no is None:
+        if db_id.dbid_no is None:
             continue
 
-        db = wrapper[db_info.dbid_no]
+        db = wrapper[db_id.dbid_no]
 
         for obj_store_name in db.object_store_names:
             # Skip empty object stores
@@ -74,14 +74,13 @@ def parse_db(
                 records_per_object_store = 0
                 for record in obj_store.iterate_records():
                     records_per_object_store += 1
-                    sourcefile = str(filepath)
                     # TODO: Fix None values
                     state = None
                     seq = None
                     extracted_values.append({
                         "key": record.key.raw_key,
                         "value": record.value,
-                        "origin_file": sourcefile,
+                        "origin_file": str(record.origin_file),
                         "store": obj_store_name,
                         "state": state,
                         "seq": seq,
