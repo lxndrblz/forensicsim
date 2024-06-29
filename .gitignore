@@ -131,3 +131,5 @@ venv/
 env/
 
 test/
+
+.DS_Store
