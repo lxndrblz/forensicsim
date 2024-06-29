@@ -129,7 +129,7 @@ def write_results_to_json(data: list[dict[str, Any]], outputpath: Path) -> None:
     try:
         with open(outputpath, "w", encoding="utf-8") as f:
             json.dump(
-                data, f, indent=4, sort_keys=True, default=str, ensure_ascii=False
+                data, f, indent=4, default=str, ensure_ascii=False
             )
     except OSError as e:
         print(e)

@@ -2,6 +2,7 @@ import json
 import warnings
 from dataclasses import dataclass, field
 from datetime import datetime
+from json import JSONDecodeError
 from pathlib import Path
 from typing import Any, Optional, Union
 
@@ -26,15 +27,22 @@ def strip_html_tags(value: str) -> str:
 
 
 def decode_dict(properties: Union[bytes, str, dict]) -> dict[str, Any]:
-    if isinstance(properties, bytes):
-        soup = BeautifulSoup(properties, features="html.parser")
-        properties = properties.decode(soup.original_encoding)
-    if isinstance(properties, dict):
-        # handle case where nested childs are dicts or list but provided with "" but have to be expanded.
-        for key, value in properties.items():
-            if isinstance(value, str) and value.startswith(("[", "{")):
-                properties[key] = json.loads(value, strict=False)
-        return properties
+    try:
+        if isinstance(properties, bytes):
+            soup = BeautifulSoup(properties, features="html.parser")
+            properties = properties.decode(
+                encoding=soup.original_encoding, errors="ignore"
+            )
+        if isinstance(properties, dict):
+            # handle case where nested childs are dicts or list but provided with "" but have to be expanded.
+            for key, value in properties.items():
+                if isinstance(value, str) and value.startswith(("[", "{")):
+                    properties[key] = json.loads(value, strict=False)
+            return properties
+    except JSONDecodeError as e:
+        print(e)
+        print("Couldn't decode dictionary ", properties)
+        return {}
 
     return json.loads(properties, strict=False)
 
