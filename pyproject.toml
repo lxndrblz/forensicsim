@@ -16,7 +16,7 @@ authors = [
 dependencies = [
 "beautifulsoup4",
 "click",
-"chromedb @ git+https://github.com/lxndrblz/chromedb@main",
+"ccl_chromium_reader @ git+https://github.com/cclgroupltd/ccl_chromium_reader@master",
 "dataclasses-json",
 "pause",
 "pyautogui",
