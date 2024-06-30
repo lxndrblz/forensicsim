@@ -43,35 +43,38 @@ from java.io import File
 from java.lang import ProcessBuilder
 from java.util import ArrayList
 from java.util.logging import Level
-from org.sleuthkit.autopsy.casemodule import Case, NoCurrentCaseException
-from org.sleuthkit.autopsy.coreutils import ExecUtil, Logger, PlatformUtil
+from org.sleuthkit.autopsy.casemodule import Case
+from org.sleuthkit.autopsy.casemodule import NoCurrentCaseException
+from org.sleuthkit.autopsy.coreutils import ExecUtil
+from org.sleuthkit.autopsy.coreutils import Logger
+from org.sleuthkit.autopsy.coreutils import PlatformUtil
 from org.sleuthkit.autopsy.datamodel import ContentUtils
-from org.sleuthkit.autopsy.ingest import (
-    DataSourceIngestModule,
-    DataSourceIngestModuleProcessTerminator,
-    IngestMessage,
-    IngestModule,
-    IngestModuleFactoryAdapter,
-    IngestServices,
-)
+from org.sleuthkit.autopsy.ingest import DataSourceIngestModule
+from org.sleuthkit.autopsy.ingest import DataSourceIngestModuleProcessTerminator
+from org.sleuthkit.autopsy.ingest import IngestMessage
+from org.sleuthkit.autopsy.ingest import IngestModule
+from org.sleuthkit.autopsy.ingest import IngestModuleFactoryAdapter
+from org.sleuthkit.autopsy.ingest import IngestServices
 from org.sleuthkit.autopsy.ingest.IngestModule import IngestModuleException
-from org.sleuthkit.datamodel import (
-    BlackboardArtifact,
-    BlackboardAttribute,
-    CommunicationsManager,
-    TskCoreException,
-    TskData,
-)
+from org.sleuthkit.datamodel import BlackboardArtifact
+from org.sleuthkit.datamodel import BlackboardAttribute
+from org.sleuthkit.datamodel import CommunicationsManager
+from org.sleuthkit.datamodel import TskCoreException
+from org.sleuthkit.datamodel import TskData
 from org.sleuthkit.datamodel.Blackboard import BlackboardException
 from org.sleuthkit.datamodel.blackboardutils import CommunicationArtifactsHelper
+from org.sleuthkit.datamodel.blackboardutils.CommunicationArtifactsHelper import (
+    CallMediaType,
+)
+from org.sleuthkit.datamodel.blackboardutils.CommunicationArtifactsHelper import (
+    CommunicationDirection,
+)
+from org.sleuthkit.datamodel.blackboardutils.CommunicationArtifactsHelper import (
+    MessageReadStatus,
+)
 from org.sleuthkit.datamodel.blackboardutils.attributes import MessageAttachments
 from org.sleuthkit.datamodel.blackboardutils.attributes.MessageAttachments import (
     URLAttachment,
-)
-from org.sleuthkit.datamodel.blackboardutils.CommunicationArtifactsHelper import (
-    CallMediaType,
-    CommunicationDirection,
-    MessageReadStatus,
 )
 
 # Common Prefix Shared for all artefacts
@@ -235,7 +238,7 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                 # ignore relative paths
                 if child_name == "." or child_name == "..":
                     continue
-                elif child.isFile():  # noqa: RET507
+                elif child.isFile():
                     ContentUtils.writeToFile(child, File(child_path))
                 elif child.isDir():
                     os.mkdir(child_path)
@@ -521,6 +524,14 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                 message_text = message["content"]
                 # Group by the conversationId, these can be direct messages, but also posts
                 thread_id = message["conversationId"]
+                # Additional Attributes
+                message_date_time_edited = 0
+                message_date_time_deleted = 0
+
+                if "edittime" in message["properties"]:
+                    message_date_time_edited = int(message["properties"]["edittime"])
+                if "deletetime" in message["properties"]:
+                    message_date_time_edited = int(message["properties"]["deletetime"])
 
                 additional_attributes = ArrayList()
                 additional_attributes.add(
@@ -694,16 +705,18 @@ class ForensicIMIngestModule(DataSourceIngestModule):
         results = file_manager.findFiles(data_source, filename, dir_name)
         if results.isEmpty():
             self.log(Level.INFO, "Unable to locate {}".format(filename))
-            return None
-        return results.get(
+            return
+        db_file = results.get(
             0
         )  # Expect a single match so retrieve the first (and only) file
+        return db_file
 
     def date_to_long(self, formatted_date):
         # Timestamp
         dt = datetime.strptime(formatted_date[:19], "%Y-%m-%dT%H:%M:%S")
         time_struct = dt.timetuple()
-        return int(calendar.timegm(time_struct))
+        timestamp = int(calendar.timegm(time_struct))
+        return timestamp
 
     # Extract the direction of a phone call
     def deduce_call_direction(self, direction):
@@ -771,7 +784,9 @@ class ForensicIMIngestModule(DataSourceIngestModule):
 
             self.log(
                 Level.INFO,
-                "Found {} {} directories to process.".format(no_directories_to_process, directory),
+                "Found {} {} directories to process.".format(
+                    directories_to_process, directory
+                ),
             )
 
             # Loop over all the files. On a multi user account these could be multiple one.

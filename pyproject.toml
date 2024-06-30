@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools >= 61.0"]
+requires = ["setuptools >= 70.0"]
 build-backend = "setuptools.build_meta"
 
 
@@ -8,7 +8,7 @@ name = "forensicsim"
 description = "A forensic open-source parser module for Autopsy that allows extracting the messages, comments, posts, contacts, calendar entries and reactions from a Microsoft Teams IndexedDB LevelDB database."
 readme = "README.md"
 license = {file = "LICENSE.md"}
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 authors = [
     { name = "Alexander Bilz", email = "github@alexbilz.com" },
     { name = "Markus Bilz", email = "github@markusbilz.com" }
@@ -113,14 +113,14 @@ commands =
 # Auto Formatting
 [testenv:format]
 commands =
-    python -m ruff src tests --fix
+    python -m ruff check --fix src tests
     python -m ruff format src
 
 # Syntax Checks
 [testenv:lint]
 commands =
     python -m mypy src/forensicsim/backend.py
-    python -m ruff --output-format=github src
+    python -m ruff check --output-format=github src
     python -m ruff format src --check
 
 # Pre-Commit
