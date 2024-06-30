@@ -26,7 +26,7 @@ import json
 from pathlib import Path
 from typing import Any, Optional
 
-from chromedb import (
+from ccl_chromium_reader import (
     ccl_chromium_indexeddb,
     ccl_chromium_localstorage,
     ccl_chromium_sessionstorage,
