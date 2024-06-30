@@ -25,7 +25,7 @@ SOFTWARE.
 import json
 from pathlib import Path
 from typing import Any, Optional
-from collections.abc import Generator
+from collections.abc import Iterator
 
 from ccl_chromium_reader import (
     ccl_chromium_indexeddb,
@@ -50,7 +50,7 @@ Additionally, it has a flag to filter for datastores, which are interesting for 
 """
 
 def custom_iterate_records(self, db_id: int, store_id: int, *,
-            live_only=False, bad_deserializer_data_handler: typing.Callable[[ccl_chromium_indexeddb.IdbKey, bytes], typing.Any] = None) -> Generator[ccl_chromium_indexeddb.IndexedDbRecord]:
+            live_only=False, bad_deserializer_data_handler: typing.Callable[[ccl_chromium_indexeddb.IdbKey, bytes], typing.Any] = None) -> Iterator[ccl_chromium_indexeddb.IndexedDbRecord]:
     blink_deserializer = ccl_chromium_indexeddb.ccl_blink_value_deserializer.BlinkV8Deserializer()
     # goodness me this is a slow way of doing things
     prefix = ccl_chromium_indexeddb.IndexedDb.make_prefix(db_id, store_id, 1)
