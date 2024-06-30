@@ -26,10 +26,11 @@
 # SOFTWARE.
 
 # Parses LevelDb's of Electron-based Microsoft Teams Desktop Client
-# May 2021
+# June 2024
 #
 # Comments
 #   Version 1.0 - Initial version - May 2021
+#   Version 1.1 - Updated vsion - June 2024
 #
 
 import calendar
@@ -42,35 +43,38 @@ from java.io import File
 from java.lang import ProcessBuilder
 from java.util import ArrayList
 from java.util.logging import Level
-from org.sleuthkit.autopsy.casemodule import Case, NoCurrentCaseException
-from org.sleuthkit.autopsy.coreutils import ExecUtil, Logger, PlatformUtil
+from org.sleuthkit.autopsy.casemodule import Case
+from org.sleuthkit.autopsy.casemodule import NoCurrentCaseException
+from org.sleuthkit.autopsy.coreutils import ExecUtil
+from org.sleuthkit.autopsy.coreutils import Logger
+from org.sleuthkit.autopsy.coreutils import PlatformUtil
 from org.sleuthkit.autopsy.datamodel import ContentUtils
-from org.sleuthkit.autopsy.ingest import (
-    DataSourceIngestModule,
-    DataSourceIngestModuleProcessTerminator,
-    IngestMessage,
-    IngestModule,
-    IngestModuleFactoryAdapter,
-    IngestServices,
-)
+from org.sleuthkit.autopsy.ingest import DataSourceIngestModule
+from org.sleuthkit.autopsy.ingest import DataSourceIngestModuleProcessTerminator
+from org.sleuthkit.autopsy.ingest import IngestMessage
+from org.sleuthkit.autopsy.ingest import IngestModule
+from org.sleuthkit.autopsy.ingest import IngestModuleFactoryAdapter
+from org.sleuthkit.autopsy.ingest import IngestServices
 from org.sleuthkit.autopsy.ingest.IngestModule import IngestModuleException
-from org.sleuthkit.datamodel import (
-    BlackboardArtifact,
-    BlackboardAttribute,
-    CommunicationsManager,
-    TskCoreException,
-    TskData,
-)
+from org.sleuthkit.datamodel import BlackboardArtifact
+from org.sleuthkit.datamodel import BlackboardAttribute
+from org.sleuthkit.datamodel import CommunicationsManager
+from org.sleuthkit.datamodel import TskCoreException
+from org.sleuthkit.datamodel import TskData
 from org.sleuthkit.datamodel.Blackboard import BlackboardException
 from org.sleuthkit.datamodel.blackboardutils import CommunicationArtifactsHelper
+from org.sleuthkit.datamodel.blackboardutils.CommunicationArtifactsHelper import (
+    CallMediaType,
+)
+from org.sleuthkit.datamodel.blackboardutils.CommunicationArtifactsHelper import (
+    CommunicationDirection,
+)
+from org.sleuthkit.datamodel.blackboardutils.CommunicationArtifactsHelper import (
+    MessageReadStatus,
+)
 from org.sleuthkit.datamodel.blackboardutils.attributes import MessageAttachments
 from org.sleuthkit.datamodel.blackboardutils.attributes.MessageAttachments import (
     URLAttachment,
-)
-from org.sleuthkit.datamodel.blackboardutils.CommunicationArtifactsHelper import (
-    CallMediaType,
-    CommunicationDirection,
-    MessageReadStatus,
 )
 
 # Common Prefix Shared for all artefacts
@@ -79,11 +83,10 @@ ARTIFACT_PREFIX = "Microsoft Teams"
 # https_teams.microsoft.com_0.indexeddb.leveldb is for business and educational accounts
 # https_teams.live.com_0.indexeddb.leveldb is for private organisations
 
-DIRECTORIES = [
+MS_TEAMS_DIRECTORIES = [
     "https_teams.microsoft.com_0.indexeddb.leveldb",
     "https_teams.live.com_0.indexeddb.leveldb",
 ]
-
 
 # Factory that defines the name and details of the module and allows Autopsy
 # to create instances of the modules that will do the analysis.
@@ -195,7 +198,7 @@ class ForensicIMIngestModule(DataSourceIngestModule):
             blackboard,
         )
 
-    def _parse_databases(self, content, progress_bar):
+    def _create_temporary_directory(self, content):
         # Create a temporary directory this directory will be used for temporarily storing the artefacts
         try:
             parent_path = content.getParentPath()
@@ -210,18 +213,15 @@ class ForensicIMIngestModule(DataSourceIngestModule):
             os.makedirs(temp_path_to_content)
             self.log(
                 Level.INFO,
-                f"Created temporary directory: {temp_path_to_content}.",
+                "Created temporary directory: {}.".format(temp_path_to_content),
             )
+            return temp_path_to_content
         except OSError:
             raise IngestModuleException(
-                f"Could not create directory: {temp_path_to_content}."
+                "Could not create directory: {}.".format(temp_path_to_content)
             )
 
-        # At first extract the desired artefacts to our newly created temp directory
-        self._extract(content, temp_path_to_content)
-
-        # Finally we can parse the extracted artefacts
-        self._analyze(content, temp_path_to_content, progress_bar)
+        
 
     def _extract(self, content, path):
         # This functions extracts the artefacts from the datasource
@@ -238,18 +238,18 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                 # ignore relative paths
                 if child_name == "." or child_name == "..":
                     continue
-                elif child.isFile():  # noqa: RET507
+                elif child.isFile():
                     ContentUtils.writeToFile(child, File(child_path))
                 elif child.isDir():
                     os.mkdir(child_path)
                     self._extract(child, child_path)
-            self.log(Level.INFO, f"Successfully extracted to {path}")
+            self.log(Level.INFO, "Successfully extracted to {}".format(path))
         except OSError:
             raise IngestModuleException(
-                f"Could not extract files to directory: {path}."
+                "Could not extract files to directory: {}.".format(path)
             )
 
-    def _analyze(self, content, path, progress_bar):
+    def _analyze(self, content, path, blob_path = None):
         # Piece together our command for running parse.exe with the appropriate parameters
         path_to_teams_json = os.path.join(path, "teams.json")
         self.log(
@@ -262,6 +262,10 @@ class ForensicIMIngestModule(DataSourceIngestModule):
         cmd.add(self.path_to_executable)
         cmd.add("--filepath")
         cmd.add(path)
+        # blob directories can be provided optionally
+        if blob_path is not None:
+            cmd.add("--blobpath")
+            cmd.add(blob_path)
         cmd.add("--outputpath")
         cmd.add(path_to_teams_json)
         process_builder = ProcessBuilder(cmd)
@@ -277,11 +281,11 @@ class ForensicIMIngestModule(DataSourceIngestModule):
             imported_records = json.load(json_file)
 
         if imported_records is not None:
-            self._process_imported_records(imported_records, content, progress_bar)
+            self._process_imported_records(imported_records, content)
         else:
             raise IngestModuleException("Extracted data is None.")
 
-    def _process_imported_records(self, imported_records, content, progress_bar):
+    def _process_imported_records(self, imported_records, content):
         # Lets attribute the messages to their respective source files
         database_sub_files = [
             i
@@ -520,6 +524,14 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                 message_text = message["content"]
                 # Group by the conversationId, these can be direct messages, but also posts
                 thread_id = message["conversationId"]
+                # Additional Attributes
+                message_date_time_edited = 0
+                message_date_time_deleted = 0
+
+                if "edittime" in message["properties"]:
+                    message_date_time_edited = int(message["properties"]["edittime"])
+                if "deletetime" in message["properties"]:
+                    message_date_time_edited = int(message["properties"]["deletetime"])
 
                 additional_attributes = ArrayList()
                 additional_attributes.add(
@@ -692,24 +704,26 @@ class ForensicIMIngestModule(DataSourceIngestModule):
         dir_name = os.path.join(content.getParentPath(), content.getName())
         results = file_manager.findFiles(data_source, filename, dir_name)
         if results.isEmpty():
-            self.log(Level.INFO, f"Unable to locate {filename}")
-            return None
-        return results.get(
+            self.log(Level.INFO, "Unable to locate {}".format(filename))
+            return
+        db_file = results.get(
             0
         )  # Expect a single match so retrieve the first (and only) file
+        return db_file
 
     def date_to_long(self, formatted_date):
         # Timestamp
         dt = datetime.strptime(formatted_date[:19], "%Y-%m-%dT%H:%M:%S")
         time_struct = dt.timetuple()
-        return int(calendar.timegm(time_struct))
+        timestamp = int(calendar.timegm(time_struct))
+        return timestamp
 
     # Extract the direction of a phone call
     def deduce_call_direction(self, direction):
         call_direction = CommunicationDirection.UNKNOWN
         if direction is not None:
             if direction == "incoming":
-                call_direction = CommunicationDirection.INCOMING
+                all_direction = CommunicationDirection.INCOMING
             elif direction == "outgoing":
                 call_direction = CommunicationDirection.OUTGOING
         return call_direction
@@ -756,22 +770,27 @@ class ForensicIMIngestModule(DataSourceIngestModule):
 
         # Locate the leveldb database. The full path on Windows systems is something like
         # C:\Users\<user>\AppData\Roaming\Microsoft\Teams\IndexedDB\https_teams.microsoft.com_0.indexeddb.leveldb
+        # We are also interested in the .blob folder as later version contain various data within these
 
         file_manager = Case.getCurrentCase().getServices().getFileManager()
 
         # There could be both personal and organisational clients on the matchine
-        for directory in DIRECTORIES:
+        for directory in MS_TEAMS_DIRECTORIES:
+            
             all_ms_teams_leveldbs = file_manager.findFiles(data_source, directory)
 
-            # Loop over all the files. On a multi user account these could be multiple one.
-            directories_to_process = len(all_ms_teams_leveldbs)
+            # Get the number of directories
+            no_directories_to_process = len(all_ms_teams_leveldbs)
 
             self.log(
                 Level.INFO,
-                f"Found {directories_to_process} {directory} directories to process.",
+                "Found {} {} directories to process.".format(
+                    directories_to_process, directory
+                ),
             )
 
-            for i, content in enumerate(all_ms_teams_leveldbs):
+            # Loop over all the files. On a multi user account these could be multiple one.
+            for i, ms_teams_database in enumerate(all_ms_teams_leveldbs):
                 # Check if the user pressed cancel while we are processing the files
                 if self.context.isJobCancelled():
                     message = IngestMessage.createMessage(
@@ -781,18 +800,53 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                     )
                     IngestServices.getInstance().postMessage(message)
                     return IngestModule.ProcessResult.OK
-                # Update progress both to the progress bar and log which file is currently processed
+
+                # Ignore files with the same file name
+                if not ms_teams_database.isDir():
+                    continue
+                
+                # Create temporary directory within Autopsy
+                temp_path_to_content = self._create_temporary_directory(ms_teams_database)
+
+                # Extract the desired artefacts to our newly created temp directory
+                self._extract(ms_teams_database, temp_path_to_content)
+
+                # Log which file is currently processed
                 self.log(
                     Level.INFO,
                     "Processing item {} of {}: {}".format(
-                        i, directories_to_process, content.getName()
+                        i, no_directories_to_process, ms_teams_database.getName()
                     ),
                 )
-                # Ignore false positives
-                if not content.isDir():
-                    continue
-                # Where the REAL extraction and analysis happens
-                self._parse_databases(content, progress_bar)
+
+                # At this stage all leveldb should be extracted so its time to look for matching blob folders 
+                # A blob folder is named like this: https_teams.live.com_0.indexeddb.blob
+                ms_teams_database_blob = None
+                blob_directory = directory.replace(".leveldb", ".blob")
+                blobs = file_manager.findFiles(data_source, blob_directory)
+
+                # There should only be one matching blob folder 
+                if len(blobs) >= 1:
+                    ms_teams_database_blob = blobs[0]
+                    self._extract(ms_teams_database_blob, temp_path_to_content)
+                    # Log which file is currently processed
+                    self.log(
+                        Level.INFO,
+                        "Processing blob directory: {}".format(
+                            ms_teams_database_blob.getName()
+                        ),
+                    )
+                    
+                # Finally we can parse the extracted artefacts
+                self._analyze(ms_teams_database, temp_path_to_content, ms_teams_database_blob)
+
+                # Log which file is currently analyzed
+                self.log(
+                    Level.INFO,
+                    "Analyzing item {} of {}: {}".format(
+                        i, no_directories_to_process, ms_teams_database.getName()
+                    ),
+                )
 
         # Once we are done, post a message to the ingest messages box
         # Message type DATA seems most appropriate
