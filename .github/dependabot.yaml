@@ -21,3 +21,10 @@ updates:
     assignees:
       - "lxndrblz"
       - "KarelZe"
+  - package-ecosystem: "devcontainers"
+    directory: "/"
+    schedule:
+      interval: weekly
+    assignees:
+      - "lxndrblz"
+      - "KarelZe"
