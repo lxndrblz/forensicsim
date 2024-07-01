@@ -42,35 +42,38 @@ from java.io import File
 from java.lang import ProcessBuilder
 from java.util import ArrayList
 from java.util.logging import Level
-from org.sleuthkit.autopsy.casemodule import Case, NoCurrentCaseException
-from org.sleuthkit.autopsy.coreutils import ExecUtil, Logger, PlatformUtil
+from org.sleuthkit.autopsy.casemodule import Case
+from org.sleuthkit.autopsy.casemodule import NoCurrentCaseException
+from org.sleuthkit.autopsy.coreutils import ExecUtil
+from org.sleuthkit.autopsy.coreutils import Logger
+from org.sleuthkit.autopsy.coreutils import PlatformUtil
 from org.sleuthkit.autopsy.datamodel import ContentUtils
-from org.sleuthkit.autopsy.ingest import (
-    DataSourceIngestModule,
-    DataSourceIngestModuleProcessTerminator,
-    IngestMessage,
-    IngestModule,
-    IngestModuleFactoryAdapter,
-    IngestServices,
-)
+from org.sleuthkit.autopsy.ingest import DataSourceIngestModule
+from org.sleuthkit.autopsy.ingest import DataSourceIngestModuleProcessTerminator
+from org.sleuthkit.autopsy.ingest import IngestMessage
+from org.sleuthkit.autopsy.ingest import IngestModule
+from org.sleuthkit.autopsy.ingest import IngestModuleFactoryAdapter
+from org.sleuthkit.autopsy.ingest import IngestServices
 from org.sleuthkit.autopsy.ingest.IngestModule import IngestModuleException
-from org.sleuthkit.datamodel import (
-    BlackboardArtifact,
-    BlackboardAttribute,
-    CommunicationsManager,
-    TskCoreException,
-    TskData,
-)
+from org.sleuthkit.datamodel import BlackboardArtifact
+from org.sleuthkit.datamodel import BlackboardAttribute
+from org.sleuthkit.datamodel import CommunicationsManager
+from org.sleuthkit.datamodel import TskCoreException
+from org.sleuthkit.datamodel import TskData
 from org.sleuthkit.datamodel.Blackboard import BlackboardException
 from org.sleuthkit.datamodel.blackboardutils import CommunicationArtifactsHelper
+from org.sleuthkit.datamodel.blackboardutils.CommunicationArtifactsHelper import (
+    CallMediaType,
+)
+from org.sleuthkit.datamodel.blackboardutils.CommunicationArtifactsHelper import (
+    CommunicationDirection,
+)
+from org.sleuthkit.datamodel.blackboardutils.CommunicationArtifactsHelper import (
+    MessageReadStatus,
+)
 from org.sleuthkit.datamodel.blackboardutils.attributes import MessageAttachments
 from org.sleuthkit.datamodel.blackboardutils.attributes.MessageAttachments import (
     URLAttachment,
-)
-from org.sleuthkit.datamodel.blackboardutils.CommunicationArtifactsHelper import (
-    CallMediaType,
-    CommunicationDirection,
-    MessageReadStatus,
 )
 
 # Common Prefix Shared for all artefacts
@@ -141,11 +144,11 @@ class ForensicIMIngestModule(DataSourceIngestModule):
             )
             if not os.path.exists(self.path_to_executable):
                 raise IngestModuleException(
-                    "Could not find main.exe within the module directory."
+                    "Could not find ms_teams_parser.exe within the module directory."
                 )
         else:
             raise IngestModuleException(
-                "This Plugin currently only works on Windows based systems."
+                "This plugin currently only works on Windows based systems."
             )
 
         blackboard = Case.getCurrentCase().getServices().getBlackboard()
@@ -210,11 +213,11 @@ class ForensicIMIngestModule(DataSourceIngestModule):
             os.makedirs(temp_path_to_content)
             self.log(
                 Level.INFO,
-                f"Created temporary directory: {temp_path_to_content}.",
+                "Created temporary directory: {}.".format(temp_path_to_content),
             )
         except OSError:
             raise IngestModuleException(
-                f"Could not create directory: {temp_path_to_content}."
+                "Could not create directory: {}.".format(temp_path_to_content)
             )
 
         # At first extract the desired artefacts to our newly created temp directory
@@ -238,15 +241,15 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                 # ignore relative paths
                 if child_name == "." or child_name == "..":
                     continue
-                elif child.isFile():  # noqa: RET507
+                elif child.isFile():
                     ContentUtils.writeToFile(child, File(child_path))
                 elif child.isDir():
                     os.mkdir(child_path)
                     self._extract(child, child_path)
-            self.log(Level.INFO, f"Successfully extracted to {path}")
+            self.log(Level.INFO, "Successfully extracted to {}".format(path))
         except OSError:
             raise IngestModuleException(
-                f"Could not extract files to directory: {path}."
+                "Could not extract files to directory: {}.".format(path)
             )
 
     def _analyze(self, content, path, progress_bar):
@@ -286,20 +289,25 @@ class ForensicIMIngestModule(DataSourceIngestModule):
         database_sub_files = [
             i
             for n, i in enumerate(imported_records)
-            if i.get("origin_file")
+            if "origin_file" in i and i.get("origin_file")
             not in [y.get("origin_file") for y in imported_records[n + 1 :]]
         ]
         try:
             for file in database_sub_files:
+                # Skip empty files as these are invalid records
+                if file["origin_file"] is None:
+                    continue
+
                 user_account_instance = None
                 teams_leveldb_file_path = self.get_level_db_file(
                     content, file["origin_file"]
                 )
+
                 # Get only the records per file
                 records = [
                     d
                     for d in imported_records
-                    if d["origin_file"] == file["origin_file"]
+                    if 'origin_file' in d and d["origin_file"] == file["origin_file"]
                 ]
                 try:
                     user_account_instance = self.get_user_account(records)
@@ -480,7 +488,12 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                 start_date = self.date_to_long(
                     call["properties"]["call-log"]["startTime"]
                 )
-                end_date = self.date_to_long(call["properties"]["call-log"]["endTime"])
+                end_date = self.date_to_long(
+                    call["properties"]["call-log"]["endTime"]
+                )
+                # Skip empty callees
+                if to_address is None:
+                    continue
 
                 helper.addCalllog(
                     call_direction,
@@ -508,18 +521,20 @@ class ForensicIMIngestModule(DataSourceIngestModule):
         # each message artifact
         try:
             for message in messages:
+
                 message_type = ARTIFACT_PREFIX
                 message_id = message["clientmessageid"]
                 direction = self.deduce_message_direction(message["isFromMe"])
                 phone_number_from = message["creator"]
                 # TODO Fix To Number
-                phone_number_to = ""
+                phone_number_to = []
                 message_date_time = self.date_to_long(message["composetime"])
                 message_read_status = MessageReadStatus.UNKNOWN
                 subject = None
                 message_text = message["content"]
                 # Group by the conversationId, these can be direct messages, but also posts
                 thread_id = message["conversationId"]
+                # Additional Attributes
 
                 additional_attributes = ArrayList()
                 additional_attributes.add(
@@ -551,11 +566,15 @@ class ForensicIMIngestModule(DataSourceIngestModule):
 
                 if "properties" in message:
                     # process links
-                    if "links" in message["properties"]:
+                    if not (message["properties"].get('links') is None):
                         for link in message["properties"]["links"]:
-                            url_attachments.add(URLAttachment(link["url"]))
+                            try:
+                                url_to_store = str(link.get('url'))
+                                url_attachments.add(URLAttachment(url_to_store))
+                            except AttributeError:
+                                continue
                     # process emotions
-                    if "emotions" in message["properties"]:
+                    if not (message["properties"].get('emotions') is None):
                         for emotion in message["properties"]["emotions"]:
                             # emotions are grouped by their key like, heart..
                             # Add one reaction entry by per
@@ -579,7 +598,7 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                     file_attachments, url_attachments
                 )
                 helper.addAttachments(artifact, message_attachments)
-
+          
         except TskCoreException as ex:
             # Severe error trying to add to case database.. case is not complete.
             # These exceptions are thrown by the CommunicationArtifactsHelper.
@@ -692,17 +711,26 @@ class ForensicIMIngestModule(DataSourceIngestModule):
         dir_name = os.path.join(content.getParentPath(), content.getName())
         results = file_manager.findFiles(data_source, filename, dir_name)
         if results.isEmpty():
-            self.log(Level.INFO, f"Unable to locate {filename}")
-            return None
-        return results.get(
+            self.log(Level.INFO, "Unable to locate {}".format(filename))
+            return
+        db_file = results.get(
             0
         )  # Expect a single match so retrieve the first (and only) file
+        return db_file
 
-    def date_to_long(self, formatted_date):
-        # Timestamp
-        dt = datetime.strptime(formatted_date[:19], "%Y-%m-%dT%H:%M:%S")
-        time_struct = dt.timetuple()
-        return int(calendar.timegm(time_struct))
+    def date_to_long(self, passed_date):
+        try:
+            # Newer versions store the dates as unix timestamps
+            composetime = float(passed_date)
+            timestamp = int(composetime)
+            # Cut off the miliseconds
+            timestamp = int(timestamp/1000)
+        except ValueError:
+            # Timestamp
+            dt = datetime.strptime(passed_date[:19], "%Y-%m-%dT%H:%M:%S")
+            time_struct = dt.timetuple()
+            timestamp = int(calendar.timegm(time_struct))
+        return timestamp
 
     # Extract the direction of a phone call
     def deduce_call_direction(self, direction):
@@ -715,10 +743,10 @@ class ForensicIMIngestModule(DataSourceIngestModule):
         return call_direction
 
     def deduce_message_direction(self, is_from_me):
-        call_direction = CommunicationDirection.INCOMING
+        message_direction = CommunicationDirection.INCOMING
         if is_from_me is True:
-            call_direction = CommunicationDirection.OUTGOING
-        return call_direction
+            message_direction = CommunicationDirection.OUTGOING
+        return message_direction
 
     def create_artifact_type(self, artifact_name, artifact_description, blackboard):
         try:
@@ -768,7 +796,9 @@ class ForensicIMIngestModule(DataSourceIngestModule):
 
             self.log(
                 Level.INFO,
-                f"Found {directories_to_process} {directory} directories to process.",
+                "Found {} {} directories to process.".format(
+                    directories_to_process, directory
+                ),
             )
 
             for i, content in enumerate(all_ms_teams_leveldbs):
