@@ -144,11 +144,11 @@ class ForensicIMIngestModule(DataSourceIngestModule):
             )
             if not os.path.exists(self.path_to_executable):
                 raise IngestModuleException(
-                    "Could not find main.exe within the module directory."
+                    "Could not find ms_teams_parser.exe within the module directory."
                 )
         else:
             raise IngestModuleException(
-                "This Plugin currently only works on Windows based systems."
+                "This plugin currently only works on Windows based systems."
             )
 
         blackboard = Case.getCurrentCase().getServices().getBlackboard()
@@ -289,20 +289,25 @@ class ForensicIMIngestModule(DataSourceIngestModule):
         database_sub_files = [
             i
             for n, i in enumerate(imported_records)
-            if i.get("origin_file")
+            if "origin_file" in i and i.get("origin_file")
             not in [y.get("origin_file") for y in imported_records[n + 1 :]]
         ]
         try:
             for file in database_sub_files:
+                # Skip empty files as these are invalid records
+                if file["origin_file"] is None:
+                    continue
+
                 user_account_instance = None
                 teams_leveldb_file_path = self.get_level_db_file(
                     content, file["origin_file"]
                 )
+
                 # Get only the records per file
                 records = [
                     d
                     for d in imported_records
-                    if d["origin_file"] == file["origin_file"]
+                    if 'origin_file' in d and d["origin_file"] == file["origin_file"]
                 ]
                 try:
                     user_account_instance = self.get_user_account(records)
@@ -483,7 +488,12 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                 start_date = self.date_to_long(
                     call["properties"]["call-log"]["startTime"]
                 )
-                end_date = self.date_to_long(call["properties"]["call-log"]["endTime"])
+                end_date = self.date_to_long(
+                    call["properties"]["call-log"]["endTime"]
+                )
+                # Skip empty callees
+                if to_address is None:
+                    continue
 
                 helper.addCalllog(
                     call_direction,
@@ -511,12 +521,13 @@ class ForensicIMIngestModule(DataSourceIngestModule):
         # each message artifact
         try:
             for message in messages:
+
                 message_type = ARTIFACT_PREFIX
                 message_id = message["clientmessageid"]
                 direction = self.deduce_message_direction(message["isFromMe"])
                 phone_number_from = message["creator"]
                 # TODO Fix To Number
-                phone_number_to = ""
+                phone_number_to = []
                 message_date_time = self.date_to_long(message["composetime"])
                 message_read_status = MessageReadStatus.UNKNOWN
                 subject = None
@@ -524,13 +535,6 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                 # Group by the conversationId, these can be direct messages, but also posts
                 thread_id = message["conversationId"]
                 # Additional Attributes
-                message_date_time_edited = 0
-                message_date_time_deleted = 0
-
-                if "edittime" in message["properties"]:
-                    message_date_time_edited = int(message["properties"]["edittime"])
-                if "deletetime" in message["properties"]:
-                    message_date_time_edited = int(message["properties"]["deletetime"])
 
                 additional_attributes = ArrayList()
                 additional_attributes.add(
@@ -562,11 +566,15 @@ class ForensicIMIngestModule(DataSourceIngestModule):
 
                 if "properties" in message:
                     # process links
-                    if "links" in message["properties"]:
+                    if not (message["properties"].get('links') is None):
                         for link in message["properties"]["links"]:
-                            url_attachments.add(URLAttachment(link["url"]))
+                            try:
+                                url_to_store = str(link.get('url'))
+                                url_attachments.add(URLAttachment(url_to_store))
+                            except AttributeError:
+                                continue
                     # process emotions
-                    if "emotions" in message["properties"]:
+                    if not (message["properties"].get('emotions') is None):
                         for emotion in message["properties"]["emotions"]:
                             # emotions are grouped by their key like, heart..
                             # Add one reaction entry by per
@@ -590,7 +598,7 @@ class ForensicIMIngestModule(DataSourceIngestModule):
                     file_attachments, url_attachments
                 )
                 helper.addAttachments(artifact, message_attachments)
-
+          
         except TskCoreException as ex:
             # Severe error trying to add to case database.. case is not complete.
             # These exceptions are thrown by the CommunicationArtifactsHelper.
@@ -710,11 +718,18 @@ class ForensicIMIngestModule(DataSourceIngestModule):
         )  # Expect a single match so retrieve the first (and only) file
         return db_file
 
-    def date_to_long(self, formatted_date):
-        # Timestamp
-        dt = datetime.strptime(formatted_date[:19], "%Y-%m-%dT%H:%M:%S")
-        time_struct = dt.timetuple()
-        timestamp = int(calendar.timegm(time_struct))
+    def date_to_long(self, passed_date):
+        try:
+            # Newer versions store the dates as unix timestamps
+            composetime = float(passed_date)
+            timestamp = int(composetime)
+            # Cut off the miliseconds
+            timestamp = int(timestamp/1000)
+        except ValueError:
+            # Timestamp
+            dt = datetime.strptime(passed_date[:19], "%Y-%m-%dT%H:%M:%S")
+            time_struct = dt.timetuple()
+            timestamp = int(calendar.timegm(time_struct))
         return timestamp
 
     # Extract the direction of a phone call
@@ -728,10 +743,10 @@ class ForensicIMIngestModule(DataSourceIngestModule):
         return call_direction
 
     def deduce_message_direction(self, is_from_me):
-        call_direction = CommunicationDirection.INCOMING
+        message_direction = CommunicationDirection.INCOMING
         if is_from_me is True:
-            call_direction = CommunicationDirection.OUTGOING
-        return call_direction
+            message_direction = CommunicationDirection.OUTGOING
+        return message_direction
 
     def create_artifact_type(self, artifact_name, artifact_description, blackboard):
         try:
