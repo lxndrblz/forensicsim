@@ -20,6 +20,12 @@ jobs:
         run: tox -e lint
       - name: Build binary 🔢
         run:  pyinstaller "main.spec"
+      - name: Upload generated binary 👩‍💻
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-excutable
+          path: .\dist\ms_teams_parser.exe
+          retention-days: 1
       - name: Run conversion ↩️
         run: |
              .\dist\ms_teams_parser.exe -f ".\forensicsim-data\jane_doe_v_1_4_00_11161\IndexedDB\https_teams.microsoft.com_0.indexeddb.leveldb" -o "jane_doe_v_1_4_00_11161.json"

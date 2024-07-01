@@ -155,6 +155,9 @@ def parse_db(
                 obj_store = db[obj_store_name]
                 records_per_object_store = 0
                 for record in obj_store.iterate_records():
+                    # skip empty records
+                    if record.external_value_path is None or record.value is None:
+                        continue
                     records_per_object_store += 1
                     # TODO: Fix None values
                     state = None
