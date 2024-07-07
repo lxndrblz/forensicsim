@@ -369,7 +369,7 @@ def process_db(
     input_path: Path,
     output_path: Path,
     blob_path: Optional[Path] = None,
-    do_not_filter: Optional[bool] = True,
+    filter_db_results: Optional[bool] = True,
 ) -> None:
     if not input_path.parts[-1].endswith(".leveldb"):
         raise ValueError(f"Expected a leveldb folder. Path: {input_path}")
@@ -377,6 +377,6 @@ def process_db(
     if blob_path is not None and not blob_path.parts[-1].endswith(".blob"):
         raise ValueError(f"Expected a .blob folder. Path: {blob_path}")
 
-    extracted_values = parse_db(input_path, blob_path, do_not_filter)
+    extracted_values = parse_db(input_path, blob_path, filter_db_results)
     parsed_records = parse_records(extracted_values)
     write_results_to_json(parsed_records, output_path)

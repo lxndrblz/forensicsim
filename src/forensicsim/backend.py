@@ -40,7 +40,7 @@ ENCODING = "iso-8859-1"
 def parse_db(
     filepath: Path,
     blobpath: Optional[Path] = None,
-    do_not_filter: Optional[bool] = False,
+    filter_db_results: Optional[bool] = True,
 ) -> list[dict[str, Any]]:
     # Open raw access to a LevelDB and deserialize the records.
 
@@ -59,7 +59,7 @@ def parse_db(
             # Skip empty object stores
             if obj_store_name is None:
                 continue
-            if obj_store_name in TEAMS_DB_OBJECT_STORES or do_not_filter is False:
+            if obj_store_name in TEAMS_DB_OBJECT_STORES or filter_db_results is False:
                 obj_store = db[obj_store_name]
                 records_per_object_store = 0
                 for record in obj_store.iterate_records():
