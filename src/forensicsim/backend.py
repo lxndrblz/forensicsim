@@ -23,8 +23,8 @@ SOFTWARE.
 """
 
 import json
-from typing import Any, Optional
 from pathlib import Path
+from typing import Any, Optional
 
 from ccl_chromium_reader import (
     ccl_chromium_indexeddb,
