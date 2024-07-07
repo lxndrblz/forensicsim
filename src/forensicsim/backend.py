@@ -64,10 +64,10 @@ def parse_db(
                 records_per_object_store = 0
                 for record in obj_store.iterate_records():
                     # skip empty records
-                    if not hasattr(record, 'value') or record.value is None:
+                    if not hasattr(record, "value") or record.value is None:
                         continue
                     # skip records without file origin
-                    if not hasattr(record, 'origin_file') or record.origin_file is None:
+                    if not hasattr(record, "origin_file") or record.origin_file is None:
                         continue
                     records_per_object_store += 1
                     # TODO: Fix None values
