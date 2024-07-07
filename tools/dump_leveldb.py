@@ -36,7 +36,7 @@ def process_level_db(
     input_path: Path, output_path: Path, blob_path: Optional[Path] = None
 ) -> None:
     # convert the database to a python list with nested dictionaries
-    extracted_values = parse_db(input_path, blob_path, do_not_filter=False)
+    extracted_values = parse_db(input_path, blob_path, filter_db_results=False)
 
     # write the output to a json file
     write_results_to_json(extracted_values, output_path)

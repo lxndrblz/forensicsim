@@ -58,7 +58,7 @@ from forensicsim.parser import process_db
 )
 def process_cmd(filepath: Path, outputpath: Path, blobpath: Path) -> None:
     click.echo(XTRACT_HEADER)
-    process_db(filepath, outputpath, blobpath, True)
+    process_db(filepath, outputpath, blobpath, filter_db_results=True)
 
 
 if __name__ == "__main__":
