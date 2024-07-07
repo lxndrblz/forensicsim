@@ -23,7 +23,7 @@ SOFTWARE.
 """
 
 import json
-import typing
+from typing import Any, Optional
 from pathlib import Path
 
 from ccl_chromium_reader import (
