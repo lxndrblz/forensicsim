@@ -112,7 +112,7 @@ def parse_sessionstorage(filepath: Path) -> list[dict[str, Any]]:
                 entry = {
                     "key": host,
                     "value": session_store_value.value,
-                    "guid": session_store_value.guid if hasattr(session_store_value, "guid") else "",
+                    "guid": getattr(session_store_value, "guid", ""),
                     "leveldb_sequence_number": session_store_value.leveldb_sequence_number,
                 }
                 extracted_values.append(entry)
