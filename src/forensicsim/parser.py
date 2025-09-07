@@ -57,14 +57,14 @@ def encode_timestamp(timestamp: Optional[datetime]) -> Optional[str]:
     return None
 
 
-JSON_CONFIG = config(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)[
-    "dataclasses_json"
-]
+JSON_CONFIG: dict[str, dict] = config(
+    letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE
+)["dataclasses_json"]
 
 
 @dataclass()
 class Meeting(DataClassJsonMixin):
-    dataclass_json_config = JSON_CONFIG
+    dataclass_json_config: dict[str, dict] = JSON_CONFIG
 
     client_update_time: Optional[str] = None
     cached_deduplication_key: Optional[str] = None
@@ -96,7 +96,7 @@ class Meeting(DataClassJsonMixin):
 
 @dataclass()
 class Message(DataClassJsonMixin):
-    dataclass_json_config = JSON_CONFIG
+    dataclass_json_config: dict[str, dict] = JSON_CONFIG
 
     attachments: list[Any] = field(default_factory=list)
     cached_deduplication_key: Optional[str] = None
@@ -159,7 +159,7 @@ class Message(DataClassJsonMixin):
 
 @dataclass()
 class Contact(DataClassJsonMixin):
-    dataclass_json_config = JSON_CONFIG
+    dataclass_json_config: dict[str, dict] = JSON_CONFIG
 
     display_name: Optional[str] = None
     email: Optional[str] = None
