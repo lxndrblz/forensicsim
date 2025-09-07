@@ -12,6 +12,7 @@ from dataclasses_json import (
     LetterCase,
     Undefined,
     config,
+    dataclass_json,
 )
 
 from forensicsim.backend import parse_db, write_results_to_json
@@ -57,15 +58,9 @@ def encode_timestamp(timestamp: Optional[datetime]) -> Optional[str]:
     return None
 
 
-JSON_CONFIG: dict[str, dict] = config(
-    letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE
-)["dataclasses_json"]
-
-
+@dataclass_json(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)
 @dataclass()
 class Meeting(DataClassJsonMixin):
-    dataclass_json_config: dict[str, dict] = JSON_CONFIG
-
     client_update_time: Optional[str] = None
     cached_deduplication_key: Optional[str] = None
     id: Optional[str] = None
@@ -94,10 +89,9 @@ class Meeting(DataClassJsonMixin):
         return self.cached_deduplication_key < other.cached_deduplication_key
 
 
+@dataclass_json(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)
 @dataclass()
 class Message(DataClassJsonMixin):
-    dataclass_json_config: dict[str, dict] = JSON_CONFIG
-
     attachments: list[Any] = field(default_factory=list)
     cached_deduplication_key: Optional[str] = None
     client_arrival_time: Optional[str] = None
@@ -157,10 +151,9 @@ class Message(DataClassJsonMixin):
         return self.cached_deduplication_key < other.cached_deduplication_key
 
 
+@dataclass_json(letter_case=LetterCase.CAMEL, undefined=Undefined.EXCLUDE)
 @dataclass()
 class Contact(DataClassJsonMixin):
-    dataclass_json_config: dict[str, dict] = JSON_CONFIG
-
     display_name: Optional[str] = None
     email: Optional[str] = None
     mri: Optional[str] = field(default=None, compare=True)
