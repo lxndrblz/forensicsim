@@ -21,7 +21,7 @@ jobs:
       - name: Build binary 🔢
         run:  pyinstaller "main.spec"
       - name: Upload generated binary 👩‍💻
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: generated-excutable
           path: .\dist\ms_teams_parser.exe
@@ -32,7 +32,7 @@ jobs:
              .\dist\ms_teams_parser.exe -f ".\forensicsim-data\john_doe_v_1_4_00_11161\IndexedDB\https_teams.microsoft.com_0.indexeddb.leveldb" -o "john_doe_v_1_4_00_11161.json"
              .\dist\ms_teams_parser.exe -f ".\forensicsim-data\karelze_v_23306_3309_2530_1346\IndexedDB\https_teams.live.com_0.indexeddb.leveldb" -o "karelze_v_23306_3309_2530_1346.json"
       - name: Upload results📲
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: generated-outputs
           path: |
