@@ -23,6 +23,7 @@ SOFTWARE.
 """
 
 import json
+import logging
 from pathlib import Path
 from typing import Any, Optional
 
@@ -32,9 +33,21 @@ from ccl_chromium_reader import (
     ccl_chromium_sessionstorage,
 )
 
+from .snappy_wrapper import install_snappy_unwrap_patch
+
+log = logging.getLogger(__name__)
+
 TEAMS_DB_OBJECT_STORES = ["replychains", "conversations", "people", "buddylist"]
 
 ENCODING = "iso-8859-1"
+
+# Install the Snappy unwrap patch on module import.
+# Fix for issue #89: Teams (2025-2026 builds) wraps large IndexedDB values
+# with Snappy compression + Blink-V8 envelope that the upstream
+# ccl_chromium_reader doesn't handle. The patch is idempotent and only affects
+# values starting with byte 0x02 (the Snappy marker) — non-wrapped values are
+# untouched.
+install_snappy_unwrap_patch()
 
 
 def parse_db(
