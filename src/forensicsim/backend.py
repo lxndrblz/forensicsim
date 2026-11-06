@@ -62,7 +62,7 @@ def parse_db(
             if obj_store_name in TEAMS_DB_OBJECT_STORES or filter_db_results is False:
                 obj_store = db[obj_store_name]
                 records_per_object_store = 0
-                for record in obj_store.iterate_records():
+                for record in obj_store.iterate_records(errors_to_stdout=True):
                     # skip empty records
                     if not hasattr(record, "value") or record.value is None:
                         continue
@@ -112,7 +112,7 @@ def parse_sessionstorage(filepath: Path) -> list[dict[str, Any]]:
                 entry = {
                     "key": host,
                     "value": session_store_value.value,
-                    "guid": session_store_value.guid,
+                    "guid": getattr(session_store_value, "guid", ""),
                     "leveldb_sequence_number": session_store_value.leveldb_sequence_number,
                 }
                 extracted_values.append(entry)
